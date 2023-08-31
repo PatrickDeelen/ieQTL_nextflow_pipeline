@@ -8,7 +8,7 @@ option_list = list(
               help="Input GTF file. (required)"),
   make_option(c("--n_genes"), action="store", default=100, type='integer',
               help="Number of genes to test in one QTL map job. "),
-  make_option(c("--feature_name"), action="store", default="GeneName",
+  make_option(c("--feature_name"), action="store", default="gene_id",
               help="The feature_id used in the expression matrix."),
   make_option(c("--biotype_flag"), action="store", default="gene_biotype",
               help="The feature_id used in the expression matrix."),
@@ -105,3 +105,12 @@ for(chr in unique(geneInfo$chromosome)){
 }
 write.table(lines,paste0(opt$out_dir,"/ChunkingFile.txt"),quote = F,sep="\t",row.names = F,col.names=F)
 
+
+##S3. make gene lengths file
+library(GenomicFeatures)
+txdb <- makeTxDbFromGFF(opt$in_gtf,format="gtf")
+# then collect the exons per gene id
+exons.list.per.gene <- exonsBy(txdb,by="gene")
+# then for each gene, reduce all the exons to a set of non overlapping exons, calculate their lengths (widths) and sum then
+exonic.gene.sizes <- sum(width(reduce(exons.list.per.gene)))
+write.table(exonic.gene.sizes,paste0(opt$out_dir,"/GeneLengths.txt"),quote = F,sep="\t",col.names=F)
