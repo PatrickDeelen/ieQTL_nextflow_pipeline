@@ -18,7 +18,13 @@ params.num_perm = 0
 raw_expr_ch = Channel.fromPath(params.expfile)
 outdir_ch = Channel.fromPath(params.outdir, type: 'dir')
 covars_ch = Channel.fromPath(params.covariates)
-// How to define the genotype channel?
+
+Channel
+    .from(params.bfile)
+    .ifEmpty { exit 1, "Input plink prefix not found!" }
+    .map { genotypes -> [file("${genotypes}.bed"), file("${genotypes}.bim"), file("${genotypes}.fam")]}
+    .set { bfile_ch }
+
 
 include { TMM_TRANSFORM_EXPRESSION; PREPARE_COVARIATES } from './modules/prepare_data.nf'
 include { ieQTL_mapping } from './modules/interaction_analysis.nf'
@@ -26,7 +32,8 @@ include { ieQTL_mapping } from './modules/interaction_analysis.nf'
 workflow {
     tmm_ch = TMM_TRANSFORM_EXPRESSION(raw_expr_ch)
     covariates_ch = PREPARE_COVARIATES(raw_expr_ch, signature_matrix, covars_ch)
-    results_ch = ieQTL_mapping(tmm_ch, Channel.fromPath(params.bfile), covariates_ch, limix_annotation, params.outdir, params.gte, params.qtls_to_test, params.covariate_to_test, params.num_perm)
+    eqtl_ch = tmm_ch.combine(bfile_ch).combine(covariates_ch).combine(Channel.fromPath(limix_annotation)).combine(Channel.fromPath(params.gte)).combine(Channel.fromPath(params.qtls_to_test)).combine(Channel.of(params.covariate_to_test))
+    results_ch = ieQTL_mapping(eqtl_ch)
     
     //cell_counts_ch.flatten().collectFile(name: 'cell_counts.txt', keepHeader: true, sort: true, storeDir: "${params.outdir}")
 }
