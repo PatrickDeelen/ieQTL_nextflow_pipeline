@@ -2,8 +2,8 @@
 nextflow.enable.dsl = 2
 
 
-gene_lengths = "$projectDir/data/Homo_sapiens.GRCh37.75.gene_lengths.txt.gz" 
-limix_annotation = "$projectDir/data/limix_gene_annotation_Ensembl71.txt.gz"
+//gene_lengths = "$projectDir/data/Homo_sapiens.GRCh37.75.gene_lengths.txt.gz" 
+//limix_annotation = "$projectDir/data/limix_gene_annotation_Ensembl71.txt.gz"
 
 /*
  * run TMM normalization on the raw expression file
@@ -33,6 +33,8 @@ process TPM {
 
     input:
     path raw_expression
+    path gene_lengths
+    path limix_annotation
 
     output:
     path "*.TPM.txt.gz"
@@ -77,6 +79,7 @@ process Deconvolution {
  * run deconvolution using nnls method with LM22 signature matrix
  */
 process CombineCovariates {
+    publishDir params.outdir, mode: 'copy'
     tag "combine covars"
     
     input:
@@ -92,6 +95,26 @@ process CombineCovariates {
     
     """
 }
+
+/*
+ * Creates a limix annotation file and a file with gene lengths from a GTF file
+ */
+process prepare_annotation {
+    publishDir params.outdir, mode: 'copy'
+    input:
+    path gtf_annotation
+
+    output:
+    	path ("LimixAnnotationFile.txt"), emit: annotation_ch 
+	path ("GeneLengths.txt"), emit: gene_lengths_ch
+	path ("ChunkingFile.txt"), emit: chunks_ch
+
+    script:
+    """
+	Rscript $projectDir/bin/createFeatureAnnotation.R --in_gtf ${gtf_annotation} --n_genes 500 --feature_name ENSG --out_dir ./
+    """
+}
+
 
 workflow TMM_TRANSFORM_EXPRESSION {
     take:
@@ -110,14 +133,15 @@ workflow PREPARE_COVARIATES {
         raw_expression_data
         signature_matrix
         covariates
+	gene_lengths
+        limix_annotation
 
     main:
-        cell_counts_ch = Deconvolution(TPM(raw_expression_data), signature_matrix)
+        cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths, limix_annotation), signature_matrix)
         covariates_ch = CombineCovariates(cell_counts_ch, covariates)
         
     emit:
         covariates_ch
 
 }
-
 

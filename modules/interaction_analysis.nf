@@ -1,17 +1,18 @@
 #! /usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
-
 /*
  * run QTL mapping
  */
 process ieQTL_mapping {
+    //publishDir "${params.outdir}/limix_output/", mode: 'copy'
+
     input:
-    tuple path(tmm_expression), path(bed), path(bim), path(fam), path(covariates), path(limix_annotation), path(gte), path(qtls_to_test), val(covariate_to_test)
+    tuple path(tmm_expression), path(bed), path(bim), path(fam), path(covariates), path(limix_annotation), path(gte), path(qtls_to_test), val(covariate_to_test), val(chunk)
     
 
     output:
-    
+    path "limix_out/*"
 
     shell:
     '''
@@ -30,14 +31,18 @@ process ieQTL_mapping {
       -fvf !{qtls_to_test} \
       -od ${outdir} \
       --interaction_term !{covariate_to_test} \
+      -gr !{chunk} \
       -np 0 \
       -maf 0.05 \
       -c -gm gaussnorm \
       -w 1000000 \
       -hwe 0.0001
       
-      
+echo !{params.outdir}
+      mkdir !{params.outdir}/limix_output/
+      cp ${outdir}/* !{params.outdir}/limix_output/  
       
     '''
 }
+
 
