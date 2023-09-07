@@ -5,7 +5,7 @@ nextflow.enable.dsl = 2
  * run QTL mapping
  */
 process ieQTL_mapping {
-    //publishDir "${params.outdir}/limix_output/", mode: 'copy'
+    tag "Chunk: $chunk"
 
     input:
     tuple path(tmm_expression), path(bed), path(bim), path(fam), path(covariates), path(limix_annotation), path(gte), path(qtls_to_test), val(covariate_to_test), val(chunk)

@@ -1,3 +1,4 @@
 work/
 .nextflow*
 *.simg
+.results/

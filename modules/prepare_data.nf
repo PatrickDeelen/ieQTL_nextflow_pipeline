@@ -61,15 +61,17 @@ process Deconvolution {
     input:
     path tpm_expression
     path signature_matrix
+    val deconvolution_method
 
     output:
     path "cell_counts.txt"
 
     script:
     """
-    Rscript $projectDir/bin/run_nnls_deconvolution.R \
+    Rscript $projectDir/bin/run_deconvolution.R \
         ${tpm_expression} \
         ${signature_matrix} \
+	${deconvolution_method} \
         cell_counts.txt
 
     """
@@ -131,14 +133,17 @@ workflow TMM_TRANSFORM_EXPRESSION {
 workflow PREPARE_COVARIATES {
     take:
         raw_expression_data
-        signature_matrix
+        signature_matrix_name
+	deconvolution_method
         covariates
 	gene_lengths
         limix_annotation
 
     main:
-        cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths, limix_annotation), signature_matrix)
-        covariates_ch = CombineCovariates(cell_counts_ch, covariates)
+	signature_matrix = "$projectDir/data/signature_matrices/" + signature_matrix_name  + ".txt.gz"
+	cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths, limix_annotation), signature_matrix, deconvolution_method)
+        // TODO: estimate RNA quality and genotype PCs
+	covariates_ch = CombineCovariates(cell_counts_ch, covariates)
         
     emit:
         covariates_ch
