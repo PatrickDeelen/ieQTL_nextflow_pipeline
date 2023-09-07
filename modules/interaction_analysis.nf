@@ -12,13 +12,13 @@ process ieQTL_mapping {
     
 
     output:
-    path "limix_out/*"
+    //path "limix_out/*"
 
     shell:
     '''
      geno=!{bed}
      plink_base=${geno%.bed}
-     outdir=${PWD}/limix_out
+     outdir=${PWD}/limix_out/
      mkdir $outdir
      ls $PWD
 
@@ -38,9 +38,18 @@ process ieQTL_mapping {
       -w 1000000 \
       -hwe 0.0001
       
-echo !{params.outdir}
-      mkdir !{params.outdir}/limix_output/
-      cp ${outdir}/* !{params.outdir}/limix_output/  
+      echo !{params.outdir}
+      if [ ! -d !{params.outdir}/limix_output/ ]
+      then
+      	mkdir !{params.outdir}/limix_output/
+      fi
+      if [ ! -z "$(ls -A ${outdir}/)" ]
+      then
+      	cp ${outdir}/* !{params.outdir}/limix_output/
+      else
+	echo "No limix output to copy"      
+      fi
+      ls -la ${outdir}/  
       
     '''
 }
