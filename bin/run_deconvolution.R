@@ -44,5 +44,10 @@ if (method == "nnls"){
 }
 proportions <- round((100/max(rowSums(coef), na.rm=TRUE))*coef, 4)
 
+# remove zero variance cell types
+mode(proportions) <- "numeric"
+proportions <- data.frame(proportions)
+proportions <- proportions[,which(!unlist(lapply(proportions, function(x) 0 == var(x)))) ]
+
 write.table(proportions, file = out_fname, sep = "\t", quote = F, col.names = NA)
 

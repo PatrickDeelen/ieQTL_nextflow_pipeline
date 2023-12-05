@@ -78,30 +78,56 @@ process Deconvolution {
 }
 
 /*
- * run deconvolution using nnls method with LM22 signature matrix
+ * Combine major covariates with cell counts, genotype PCs and RNA-quality
  */
-process CombineCovariates {
+process CombineCovariatesRNAqual {
     publishDir params.outdir, mode: 'copy'
-    tag "combine covars"
-    
+    tag "combine covars rnaqual"
+
     input:
+    path general_covariates
     path cell_counts
-    path covariates
+    path genotype_PCs
+    path gte
+    path rna_qual
 
     output:
-    path "covariates.INT.txt"
+    path "covariates.combined.txt"
 
     script:
     """
-    Rscript $projectDir/bin/combine_covariates_run_INT.R ${covariates} ${cell_counts} covariates.INT.txt
-    
+    Rscript $projectDir/bin/combine_all_covariates.R -s ${general_covariates} -c ${cell_counts} -g ${genotype_PCs} -i ${gte} -o covariates.combined.txt -r ${rna_qual}
+
+    """
+}
+
+/*
+ * Combine major covariates with cell counts, genotype PCs
+ */
+process CombineCovariates {
+    publishDir params.outdir, mode: 'copy'
+    tag "combine covars rnaqual"
+
+    input:
+    path general_covariates
+    path cell_counts
+    path genotype_PCs
+    path gte
+
+    output:
+    path "covariates.combined.txt"
+
+    script:
+    """
+    Rscript $projectDir/bin/combine_all_covariates.R -s ${general_covariates} -c ${cell_counts} -g ${genotype_PCs} -i ${gte} -o covariates.combined.txt 
+
     """
 }
 
 /*
  * Creates a limix annotation file and a file with gene lengths from a GTF file
  */
-process prepare_annotation {
+process PrepareAnnotation {
     publishDir params.outdir, mode: 'copy'
     input:
     path gtf_annotation
@@ -118,6 +144,20 @@ process prepare_annotation {
 }
 
 
+process CalculateRNAQualityScore {
+    input:
+    path tmm_expression_data
+    
+    output:
+	path ("RNA_quality.txt_CorrelationsWithAverageExpression.txt.gz"), emit: rnaquality_ch
+
+    script:
+    """
+	python3 $projectDir/bin/correlate_samples_with_avg_gene_expression.py -ex ${tmm_expression_data} -op RNA_quality.txt -log2
+    """
+
+}
+
 workflow TMM_TRANSFORM_EXPRESSION {
     take:
         raw_expression_data
@@ -132,19 +172,28 @@ workflow TMM_TRANSFORM_EXPRESSION {
 
 workflow PREPARE_COVARIATES {
     take:
-        raw_expression_data
-        signature_matrix_name
+        exp_type
+	raw_expression_data
+        normalized_expression_data
+	signature_matrix_name
 	deconvolution_method
         covariates
 	gene_lengths
         limix_annotation
+	genotype_pcs
+	gte
 
     main:
 	signature_matrix = "$projectDir/data/signature_matrices/" + signature_matrix_name  + ".txt.gz"
-	cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths, limix_annotation), signature_matrix, deconvolution_method)
-        // TODO: estimate RNA quality and genotype PCs
-	covariates_ch = CombineCovariates(cell_counts_ch, covariates)
-        
+	if (exp_type == "rnaseq") {
+	    cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths, limix_annotation), signature_matrix, deconvolution_method)
+            rna_qual_ch = CalculateRNAQualityScore(normalized_expression_data)
+	    // TODO: estimate RNA quality and genotype PCs
+	    covariates_ch = CombineCovariatesRNAqual(covariates,cell_counts_ch, genotype_pcs, gte, rna_qual_ch)
+        } else {
+	    cell_counts_ch = Deconvolution(raw_expression_data, signature_matrix, deconvolution_method)
+	    covariates_ch = CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
+	}
     emit:
         covariates_ch
 

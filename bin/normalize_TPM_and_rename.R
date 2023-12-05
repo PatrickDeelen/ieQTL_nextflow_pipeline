@@ -26,7 +26,7 @@ bulk_expr_tpm <- do.call(cbind, lapply(1:ncol(bulk_expr), function(i) {
 colnames(bulk_expr_tpm) <- colnames(bulk_expr)
 
 # Convert Ensembl ids to gene names
-new_names <-  probe_annotation[match(row.names(bulk_expr_tpm), row.names(probe_annotation), nomatch = "NA"),"GeneName"]
+new_names <-  probe_annotation[match(row.names(bulk_expr_tpm), row.names(probe_annotation), nomatch = "NA"),"gene_name"]
 new_names <- gsub(" ", "", new_names, fixed = TRUE)
 row.names(bulk_expr_tpm) <- new_names
 
