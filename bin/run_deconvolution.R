@@ -13,12 +13,13 @@ deconvolve_nnls <- function(y, x){
   return(coeff)
 }
 
-deconvolve_dtangle <- function(y, x){
+deconvolve_dtangle <- function(y, x, dtype = "rna-seq"){
   library(dtangle)
   res <- dtangle(
     Y = log2(t(y)+1), 
     references = log2(t(x)+1),
-    marker_method = "ratio")
+    marker_method = "ratio",
+    data_type = dtype)
   
   return(res$estimates)
 }
@@ -27,6 +28,13 @@ expr_fname = args[1]
 sign_fname = args[2]
 method= args[3]
 out_fname = args[4]
+
+datatype="rna-seq"
+if (length(args) > 4) datatype = args[5]
+
+if (datatype %in% c("rna-seq", "rnaseq", "RNAseq")) datatype="rna-seq"
+if (datatype %in% c("microarray", "array")) datatype = "microarray-gene"
+
 
 bulk_expr_tpm <- as.matrix(read.delim(expr_fname, row.names = 1, header = T, as.is = T, check.names = F, sep = "\t"))
 signature_matrix <- as.matrix(read.delim(sign_fname, row.names = 1, header = T, as.is = T, check.names = F, sep = "\t"))
@@ -38,7 +46,7 @@ cat(length(shared_genes), "genes shared between expression table and signature m
 if (method == "nnls"){
   coef <- deconvolve_nnls(x = signature_matrix[shared_genes,], y = bulk_expr_tpm[shared_genes,])
 } else if (method == "dtangle") {
-  coef <- deconvolve_dtangle(x = signature_matrix[shared_genes,], y = bulk_expr_tpm[shared_genes,])
+  coef <- deconvolve_dtangle(x = signature_matrix[shared_genes,], y = bulk_expr_tpm[shared_genes,], dtype = datatype)
 } else {
   cat ("Wrong deconvolution method!\n")
 }

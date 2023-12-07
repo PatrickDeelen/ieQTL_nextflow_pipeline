@@ -62,6 +62,7 @@ process Deconvolution {
     path tpm_expression
     path signature_matrix
     val deconvolution_method
+    val exptype
 
     output:
     path "cell_counts.txt"
@@ -72,7 +73,8 @@ process Deconvolution {
         ${tpm_expression} \
         ${signature_matrix} \
 	${deconvolution_method} \
-        cell_counts.txt
+        cell_counts.txt \
+        ${exptype}
 
     """
 }
@@ -120,7 +122,6 @@ process CombineCovariates {
     script:
     """
     Rscript $projectDir/bin/combine_all_covariates.R -s ${general_covariates} -c ${cell_counts} -g ${genotype_PCs} -i ${gte} -o covariates.combined.txt 
-
     """
 }
 
@@ -186,12 +187,11 @@ workflow PREPARE_COVARIATES {
     main:
 	signature_matrix = "$projectDir/data/signature_matrices/" + signature_matrix_name  + ".txt.gz"
 	if (exp_type == "rnaseq") {
-	    cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths, limix_annotation), signature_matrix, deconvolution_method)
+	    cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths, limix_annotation), signature_matrix, deconvolution_method, exp_type)
             rna_qual_ch = CalculateRNAQualityScore(normalized_expression_data)
-	    // TODO: estimate RNA quality and genotype PCs
 	    covariates_ch = CombineCovariatesRNAqual(covariates,cell_counts_ch, genotype_pcs, gte, rna_qual_ch)
         } else {
-	    cell_counts_ch = Deconvolution(raw_expression_data, signature_matrix, deconvolution_method)
+	    cell_counts_ch = Deconvolution(normalized_expression_data, signature_matrix, deconvolution_method, exp_type)
 	    covariates_ch = CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
 	}
     emit:
