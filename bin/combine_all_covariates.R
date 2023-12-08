@@ -1,5 +1,8 @@
 library(optparse)
+library(ggplot2)
 library(dplyr)
+library(tidyr)
+library(patchwork)
 
 option_list <- list(
   make_option(c("-s", "--general_covs"), type = "character",
@@ -54,9 +57,11 @@ covar$Row.names = NULL
 covar <- covar[,colSums(is.na(covar)) < nrow(covar)]
 covar <- na.omit(covar)
 
-contin_covars <- apply(covar, 2, function(x) length(unique(x)) > 3)
-covar_int <- cbind(covar[,!contin_covars], apply(covar[,contin_covars], 2, function(x) qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x))) ))
-colnames(covar_int) <- c(colnames(covar)[!contin_covars], colnames(covar)[contin_covars])
+
+#contin_covars <-  apply(covar, 2, function(x) length(unique(x)) > 3)
+covar_names_for_INT <- names(which(apply(covar, 2, function(x) length(unique(x)) > 3)))
+#covar_int <- cbind(covar[,!contin_covars], apply(covar[,contin_covars], 2, function(x) qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x))) ))
+#colnames(covar_int) <- c(colnames(covar)[!contin_covars], colnames(covar)[contin_covars])
 
 cat("Combined major covariates with cell counts\n")
 cat ("Number of covariates in the combined file:", ncol(covar), "\n")
@@ -66,7 +71,7 @@ cat("Number of samples with covariate data available:", nrow(covar), "\n")
 geno_pcs <- read.delim(args$genotype_pcs, check.names = F, header = T, row.names = 1, as.is = T)
 geno_pcs <- rename_samples(geno_pcs[,1:4], gte)
 
-covar_merged <- merge(covar_int, geno_pcs, by = 0)
+covar_merged <- merge(covar, geno_pcs, by = 0)
 row.names(covar_merged) <- covar_merged$Row.names
 covar_merged$Row.names = NULL
 
@@ -76,7 +81,10 @@ cat("Number of samples with covariate data available:", nrow(covar_merged), "\n"
 
 if (! is.null(args$rna_qual)){
   rna_qual <- read.delim(args$rna_qual, check.names = F, header = T, row.names = 1, as.is = T)
-  
+  print(head(rna_qual))
+  print(covar_names_for_INT)
+  print(colnames(rna_qual))
+  covar_names_for_INT <- c(covar_names_for_INT, colnames(rna_qual)) 
   covar_merged <- merge(covar_merged, rna_qual, by = 0)
   row.names(covar_merged) <- covar_merged$Row.names
   covar_merged$Row.names = NULL
@@ -88,5 +96,20 @@ if (! is.null(args$rna_qual)){
 }
 
 
-write.table(covar_merged, file = args$out, sep = "\t", quote = F, col.names = NA)
+# run INT on general covariates, cell counts and RNA quality
+covar_merged_int <- cbind(covar_merged[, !colnames(covar_merged) %in% covar_names_for_INT], apply(covar_merged[,covar_names_for_INT], 2, function(x) qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x))) ))
+colnames(covar_merged_int) <- c(colnames(covar_merged[, !colnames(covar_merged) %in% covar_names_for_INT]), covar_names_for_INT)
+
+# Plot covariate distributions prior to INT
+pdf(paste0(args$out, ".distributions.pdf"), height = 5, width = 10)
+#covar_long <- pivot_longer(covar_merged, cols = everything())
+for (covar_name in colnames(covar_merged)){
+   p1 <- ggplot(covar_merged, aes(get(covar_name))) + geom_histogram(bins = 50, color = "black", alpha = 0.5, fill = "dodgerblue4") + theme_bw() + xlab(covar_name) + ggtitle(paste0("Raw ", covar_name))
+   p2 <- ggplot(covar_merged_int, aes(get(covar_name))) + geom_histogram(bins = 50, color = "black", alpha = 0.5, fill = "dodgerblue4") + theme_bw() + xlab(covar_name) + ggtitle(paste0("INT ", covar_name))
+   print(p1 + p2)
+}
+dev.off()
+
+# Write INT covariates 
+write.table(covar_merged_int, file = args$out, sep = "\t", quote = F, col.names = NA)
 

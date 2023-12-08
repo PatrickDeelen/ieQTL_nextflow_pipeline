@@ -22,6 +22,7 @@ def helpMessage() {
         --genes_to_test signif_eqtl_genes.txt \
         --genome_build GRCh37 \
         --outdir LLD_interaction_res \
+	--plink2_executable plink2 \
         -profile slurm \
         -resume
 
@@ -46,6 +47,7 @@ def helpMessage() {
     """.stripIndent()
 }
 
+//params.raw_expfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/expression_data.all.txt.gz"
 params.raw_expfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/expression_data.txt"
 params.norm_expfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/LLD.gene_read_counts_BIOS_and_LLD_passQC.TMM.txt.gz"
 params.bfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input//LLD_genotypes_flt"
@@ -64,6 +66,8 @@ params.cohort_name = "LLD"
 params.signature_matrix_name = "LM22"
 params.deconvolution_method = "nnls"
 params.num_perm = 0
+
+params.plink2_executable = "plink2"
 
 raw_expr_ch = Channel.fromPath(params.raw_expfile)
 norm_exp_ch = Channel.fromPath(params.norm_expfile)
