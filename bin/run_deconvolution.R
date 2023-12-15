@@ -32,8 +32,8 @@ out_fname = args[4]
 datatype="rna-seq"
 if (length(args) > 4) datatype = args[5]
 
-if (datatype %in% c("rna-seq", "rnaseq", "RNAseq")) datatype="rna-seq"
-if (datatype %in% c("microarray", "array")) datatype = "microarray-gene"
+if (datatype %in% c("rna-seq", "rnaseq", "RNAseq", "RNAseq_HGNC")) datatype="rna-seq"
+if (datatype %in% c("microarray", "array", "HT12v3", "HT12v4", "HuRef8", "AffyU219", "AffyHumanExon")) datatype = "microarray-gene"
 
 
 bulk_expr_tpm <- as.matrix(read.delim(expr_fname, row.names = 1, header = T, as.is = T, check.names = F, sep = "\t"))

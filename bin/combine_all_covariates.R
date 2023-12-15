@@ -16,7 +16,9 @@ option_list <- list(
   make_option(c("-i", "--gte"), type = "character",
               help = "Path to the genotype to expression id conversion file."),
   make_option(c("-o", "--out"), type = "character",
-              help = "Output file name.")
+              help = "Output file name."),
+  make_option(c("-n", "--rename"), type = "boolean",
+              help = "Are raw expression sample ids different from genotype sample ids?.")
 )
 
 parser <- OptionParser(usage = "%prog [options] file", option_list = option_list)
@@ -28,7 +30,7 @@ rename_samples <- function(d, gte, key_col = 1, value_col = 2){
     cat("Sample ids are already converted to expression ids! Skipping id conversion.\n")
     return(d)
   }
-  d_m <- d[match(gte[,key_col], row.names(d), nomatch = 0),]
+  d_m <- d[match(gte[,key_col], row.names(d), nomatch = 0),, drop = F]
   gte_m <- gte[match(row.names(d_m), gte[,key_col], nomatch = 0),]
   row.names(d_m) <- gte_m[,value_col]
   cat("Coverted genotype sample ids to expression sample ids.\nN samples before: ", nrow(d), "\nN samples after: ", nrow(d_m), "\n")
@@ -48,7 +50,8 @@ run_INT <- function(d){
 covar_main <- read.delim(args$general_covs, check.names = F, header = T, row.names = 1, as.is = T, sep ="\t")
 covar_cell_counts <- read.delim(args$cell_counts, check.names = F, header = T, row.names = 1, as.is = T, sep ="\t")
 gte <- read.delim(args$gte, check.names = F, header = F, as.is = T, sep ="\t")
-covar_main <- rename_samples(covar_main, gte)
+#covar_main <- rename_samples(covar_main, gte)
+covar_cell_counts <- rename_samples(covar_cell_counts, gte, key_col = 2, value_col = 1)
 
 covar <- merge(covar_main, covar_cell_counts, by = 0)
 row.names(covar) <- covar$Row.names
@@ -69,7 +72,7 @@ cat("Number of samples with covariate data available:", nrow(covar), "\n")
 
 # add genotype PCs
 geno_pcs <- read.delim(args$genotype_pcs, check.names = F, header = T, row.names = 1, as.is = T)
-geno_pcs <- rename_samples(geno_pcs[,1:4], gte)
+#geno_pcs <- rename_samples(geno_pcs[,1:4], gte)
 
 covar_merged <- merge(covar, geno_pcs, by = 0)
 row.names(covar_merged) <- covar_merged$Row.names
@@ -81,9 +84,7 @@ cat("Number of samples with covariate data available:", nrow(covar_merged), "\n"
 
 if (! is.null(args$rna_qual)){
   rna_qual <- read.delim(args$rna_qual, check.names = F, header = T, row.names = 1, as.is = T)
-  print(head(rna_qual))
-  print(covar_names_for_INT)
-  print(colnames(rna_qual))
+  #rna_qual <- rename_samples(rna_qual, gte)
   covar_names_for_INT <- c(covar_names_for_INT, colnames(rna_qual)) 
   covar_merged <- merge(covar_merged, rna_qual, by = 0)
   row.names(covar_merged) <- covar_merged$Row.names

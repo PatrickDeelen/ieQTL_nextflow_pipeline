@@ -35,6 +35,7 @@ process TPM {
     path raw_expression
     path gene_lengths
     path limix_annotation
+    val exp_platform
 
     output:
     path "*.TPM.txt.gz"
@@ -45,7 +46,8 @@ process TPM {
         ${raw_expression} \
         ${gene_lengths} \
         $limix_annotation \
-        expression.TPM.txt
+        expression.TPM.txt \
+        $exp_platform
         
     gzip -f expression.TPM.txt
     """
@@ -160,6 +162,69 @@ process CalculateRNAQualityScore {
 
 }
 
+process NormalizeExpression {
+    publishDir params.outdir, mode: 'copy'
+    input:
+      path(raw_expr)
+      val(exp_platform)
+      path(gte)
+      path(check_sex)
+      path(fam_file)
+
+    output:
+	path ('outputfolder_exp'), emit: expression_folder 
+	path ('outputfolder_exp/exp_data_QCd/exp_data_preprocessed.txt'), emit: norm_expression_table
+    
+    shell:
+    '''
+       if [[ !{exp_platform} == "HT12v3" ]]; then
+            probe_mapping_file=!{baseDir}/data/EmpiricalProbeMatching_IlluminaHT12v3.txt
+        elif [[ !{exp_platform} == "HuRef8" ]]; then
+            probe_mapping_file=!{baseDir}/data/EmpiricalProbeMatching_IlluminaHuRef8.txt
+        elif [[ !{exp_platform} == "HT12v4" ]]; then
+            probe_mapping_file=!{baseDir}/data/EmpiricalProbeMatching_IlluminaHT12v4.txt
+        elif [[ !{exp_platform} == "RNAseq" ]]; then
+            probe_mapping_file=!{baseDir}/data/EmpiricalProbeMatching_RNAseq.txt
+        elif [[ !{exp_platform} == "AffyU219" ]]; then
+            probe_mapping_file=!{baseDir}/data/EmpiricalProbeMatching_AffyU219.txt
+        elif [[ !{exp_platform} == "AffyHumanExon" ]]; then
+            probe_mapping_file=!{baseDir}/data/EmpiricalProbeMatching_AffyHumanExon.txt
+        elif [[ !{exp_platform} == "RNAseq_HGNC" ]]; then
+            probe_mapping_file=!{baseDir}/data/HgncToEnsemblProbeMatching.txt
+        fi
+        echo $probe_mapping_file
+        
+        outdir=${PWD}/outputfolder_exp/
+
+        Rscript !{baseDir}/bin/ProcessExpression.R \
+           -e !{raw_expr} \
+           -l !{gte} \
+           -p !{exp_platform} \
+           -m $probe_mapping_file \
+           -i !{check_sex} \
+           -f !{fam_file} \
+           -o ${outdir}    
+    '''
+}
+
+process SplitCovariates {
+    publishDir params.outdir, mode: 'copy'
+    input:
+    path normalized_expression_data
+    path combined_covariates
+    val covariate_name
+    
+
+    output:
+        path "*txt"
+
+    script:
+    """
+        Rscript $projectDir/bin/split_covariate_into_bins.R $combined_covariates $covariate_name $normalized_expression_data ./ 
+    """
+
+}
+
 workflow TMM_TRANSFORM_EXPRESSION {
     take:
         raw_expression_data
@@ -187,8 +252,8 @@ workflow PREPARE_COVARIATES {
 
     main:
 	signature_matrix = "$projectDir/data/signature_matrices/" + signature_matrix_name  + ".txt.gz"
-	if (exp_type == "rnaseq") {
-	    cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths, limix_annotation), signature_matrix, deconvolution_method, exp_type)
+	if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") {
+	    cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths, limix_annotation, exp_type), signature_matrix, deconvolution_method, exp_type)
             rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
 	    CombineCovariatesRNAqual(covariates,cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
 	    covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
