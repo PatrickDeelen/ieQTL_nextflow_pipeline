@@ -85,7 +85,7 @@ annotation_ch = Channel.fromPath("$projectDir/data/LimixAnnotationFile.txt.gz")
 gene_lengths_ch = Channel.fromPath("$projectDir/data/GeneLengths.txt.gz")
 
 Channel
-    .from("$projectDir/data/ChunkingFile_test.txt")
+    .fromPath("$projectDir/data/ChunkingFile_test2.txt")
     .splitCsv( header: false )
     .map { row -> row[0] }
     .set { chunk_ch }
@@ -110,7 +110,7 @@ Channel
     .set { bfile_ch }
 
 include { PREPARE_COVARIATES; PrepareAnnotation; NormalizeExpression } from './modules/prepare_data.nf'
-include { IeQTLmappingPerSNPGene; IeQTLmappingPerGene } from './modules/interaction_analysis.nf'
+include { IeQTLmappingPerSNPGene; IeQTLmappingPerGene; IeQTLmappingPerGeneNoChunks } from './modules/interaction_analysis.nf'
 
 workflow {
     //bgen_genotypes_ch = ConvertGenotypes(vcf_ch)
@@ -122,12 +122,13 @@ workflow {
     //to run in chunks:
     //PrepareAnnotation.out.chunks_ch.splitCsv( header: false ).map { row -> row[0] }.set { chunk_ch }
     
-    //eqtl_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test)).combine(chunk_ch)
-    //results_ch = IeQTLmappingPerGene(eqtl_ch)
+    eqtl_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test)).combine(chunk_ch)
+    eqtl_ch.view()
+    results_ch = IeQTLmappingPerGene(eqtl_ch)
 
     //without chunks:
-    eqtl_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test))
-    results_ch = IeQTLmappingPerGeneNoChunks(eqtl_ch)
+    //eqtl_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test))
+    //results_ch = IeQTLmappingPerGeneNoChunks(eqtl_ch)
 }
 
 workflow.onComplete {

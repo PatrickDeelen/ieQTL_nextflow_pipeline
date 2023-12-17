@@ -134,7 +134,8 @@ process IeQTLmappingPerGeneNoChunks {
       -maf 0.05 \
       -c -gm gaussnorm \
       -w 1000000 \
-      -hwe 0.0001 
+      -hwe 0.0001 \
+      -gr 2:1-400000000
       
       echo !{params.outdir}
       if [ ! -d !{params.outdir}/limix_output/ ]
