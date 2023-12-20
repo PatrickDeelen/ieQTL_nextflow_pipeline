@@ -47,11 +47,18 @@ def helpMessage() {
     """.stripIndent()
 }
 
+
+params.bfile = ''
+//params.vcf_dir = ''
+params.bgen_dir = ''
+//params.bfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/output//chr2_v2"
+params.vcf_dir = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/postimpute/"
+//params.bgen_dir = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/output/"
+
+
 params.raw_expfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/expression_data.all.txt.gz"
 //params.raw_expfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/expression_data.txt"
 params.norm_expfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/exp_data_preprocessed2.txt"
-params.bfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input//LLD_genotypes_flt"
-//params.vcf = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input//LLD_genotypes_flt.vcf.gz"
 params.covariates = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/v2/LLD_age_sex.txt"
 
 params.gte = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/LLD_gte.txt"
@@ -73,10 +80,12 @@ params.num_perm = 0
 
 params.plink2_executable = "plink2"
 
-
+/*
+ * Channel declarations
+ */
 
 raw_expr_ch = Channel.fromPath(params.raw_expfile)
-norm_exp_ch = Channel.fromPath(params.norm_expfile)
+filt_exp_ch = Channel.fromPath(params.norm_expfile)
 outdir_ch = Channel.fromPath(params.outdir, type: 'dir')
 covars_ch = Channel.fromPath(params.covariates)
 gtf_annotation_ch = Channel.fromPath(params.gtf)
@@ -87,48 +96,82 @@ gene_lengths_ch = Channel.fromPath("$projectDir/data/GeneLengths.txt.gz")
 Channel
     .fromPath("$projectDir/data/ChunkingFile_test2.txt")
     .splitCsv( header: false )
-    .map { row -> row[0] }
+    .map { row -> tuple(row[0].split(':')[0], row[0]) }
     .set { chunk_ch }
 
-/*if (params.vcf == '') {
+
+if (params.bgen_dir != '') {
+  Channel.from(2..3)
+  .map { chr -> tuple("$chr", file("${params.bgen_dir}/*chr${chr}.bgen"), file("${params.bgen_dir}/*chr${chr}.sample")) }
+  .ifEmpty { exit 1, "Input .bgen files not found!" }
+  .set { chr_bgen_pairs }
+} else if (params.vcf_dir != '') {
+  Channel.from(2..3)
+  .map { chr -> tuple("$chr", file("${params.vcf_dir}/*chr${chr}.filtered.vcf.gz")) }
+  .ifEmpty { exit 1, "Input .vcf.gz files not found!" }
+  .set { chr_vcf_pairs }
+  Channel.empty()
+    .set { chr_bgen_pairs }
+} else {
   Channel
     .from(params.bfile)
     .ifEmpty { exit 1, "Input plink prefix not found!" }
     .map { genotypes -> [file("${genotypes}.bed"), file("${genotypes}.bim"), file("${genotypes}.fam")]}
     .set { bfile_ch }
-  Channel.empty()
-    .set { vcf_ch }
-} else {
-  vcf_ch = Channel.fromPath(params.vcf)
-  Channel.empty()
-    .set { bfile_ch }
-}*/
-Channel
-    .from(params.bfile)
-    .ifEmpty { exit 1, "Input plink prefix not found!" }
-    .map { genotypes -> [file("${genotypes}.bed"), file("${genotypes}.bim"), file("${genotypes}.fam")]}
-    .set { bfile_ch }
+} 
 
-include { PREPARE_COVARIATES; PrepareAnnotation; NormalizeExpression } from './modules/prepare_data.nf'
-include { IeQTLmappingPerSNPGene; IeQTLmappingPerGene; IeQTLmappingPerGeneNoChunks } from './modules/interaction_analysis.nf'
+
+include { PREPARE_COVARIATES; PrepareAnnotation; NormalizeExpression; NormalizeExpressionV2; ConvertVcfToBgen; ConvertVcfToPlink; MergePlinkPerChr } from './modules/prepare_data.nf'
+include { IeQTLmappingPerSNPGene; IeQTLmappingPerGene; IeQTLmappingPerGeneNoChunks; IeQTLmappingPerGeneBgen } from './modules/interaction_analysis.nf'
+
+/* 
+ * Analysis
+ */
 
 workflow {
-    //bgen_genotypes_ch = ConvertGenotypes(vcf_ch)
-     NormalizeExpression(raw_expr_ch, params.platform, gte_ch, Channel.fromPath(params.check_sex), Channel.fromPath(params.geno_fam) )
-     norm_exp_ch = NormalizeExpression.out.norm_expression_table
+    /*
+     * Prepare expression and covariate data
+     */
+    //NormalizeExpression(raw_expr_ch, params.platform, gte_ch, Channel.fromPath(params.check_sex), Channel.fromPath(params.geno_fam) )
+    NormalizeExpressionV2(raw_expr_ch, filt_exp_ch, params.platform, gte_ch )
+    norm_exp_ch = NormalizeExpressionV2.out.norm_expression_table
 
-    covariates_ch = PREPARE_COVARIATES(params.platform, raw_expr_ch, norm_exp_ch, params.signature_matrix_name, params.deconvolution_method,covars_ch, gene_lengths_ch, annotation_ch, params.genotype_pcs, params.gte)
-    //covariates_ch = PREPARE_COVARIATES(params.platform, raw_expr_ch, NormalizeExpression(raw_expr_ch, params.platform, gte_ch, Channel.fromPath(params.check_sex), Channel.fromPath(params.geno_fam) ).out.norm_expression_table, params.signature_matrix_name, params.deconvolution_method,covars_ch, gene_lengths_ch, annotation_ch, params.genotype_pcs, params.gte)
-    //to run in chunks:
-    //PrepareAnnotation.out.chunks_ch.splitCsv( header: false ).map { row -> row[0] }.set { chunk_ch }
+    //covariates_ch = PREPARE_COVARIATES(params.platform, raw_expr_ch, norm_exp_ch, params.signature_matrix_name, params.deconvolution_method,covars_ch, gene_lengths_ch, annotation_ch, params.genotype_pcs, params.gte)
+    covariates_ch = Channel.fromPath("/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/output/covariates.combined.txt")
     
-    eqtl_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test)).combine(chunk_ch)
-    eqtl_ch.view()
-    results_ch = IeQTLmappingPerGene(eqtl_ch)
+    /*
+     * Prepare genotype data and run ieQTL mapping
+     */
+    
+    /*if (params.bfile == '') {
+      println "No plink genotypes, will use bgen"
+      if (params.bgen_dir == ''){ // Genotype convertion
+        println "Converting VCF to bgen"
+        ConvertVcfToBgen(chr_vcf_pairs)
+        chr_bgen_pairs = ConvertVcfToBgen.out.bgen_ch.view()
+      }
 
-    //without chunks:
-    //eqtl_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test))
-    //results_ch = IeQTLmappingPerGeneNoChunks(eqtl_ch)
+      // ieQTL mapping
+      chunk_geno_ch = chunk_ch.join(chr_bgen_pairs).view()
+      eqtl_ch = norm_exp_ch.combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test)).combine(chunk_geno_ch)
+      results_ch = IeQTLmappingPerGeneBgen(eqtl_ch)
+
+    } else { // Plink genotypes
+      */
+
+      if (params.bfile == '') {
+        ConvertVcfToPlink(chr_vcf_pairs)
+        MergePlinkPerChr(ConvertVcfToPlink.out.bfile_per_chr_ch.collect().view())
+      }
+      eqtl_ch = norm_exp_ch.combine(MergePlinkPerChr.out.bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test)).combine(chunk_ch.map { it[1] })
+      results_ch = IeQTLmappingPerGene(eqtl_ch)
+
+      //run without chunks:
+      //eqtl_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test))
+      //results_ch = IeQTLmappingPerGeneNoChunks(eqtl_ch)
+
+    //}
+    
 }
 
 workflow.onComplete {
