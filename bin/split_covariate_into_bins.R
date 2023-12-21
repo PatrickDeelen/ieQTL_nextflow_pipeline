@@ -10,6 +10,7 @@ output_prefix <- args[4]
 pheno_is_factor <- F
 if (length(unique(covars[,covar_name])) < 3) pheno_is_factor <- T
 
+cat ("covariate ", covar_name, " is a factor: ", pheno_is_factor, "\n")
 
 exp_summary <- function(x){
   per_gene_mean <- apply(x, 1, mean)
@@ -45,13 +46,16 @@ shap_test <- function(x){
 }
 
 if (pheno_is_factor){
+  level_num = 1
   for (level in unique(covars[,covar_name])){
     covar_for_bin <- covars[covars[,covar_name] == level,]
     expr_summary_for_bin <- exp_summary(norm_expression[row.names(covar_for_bin), ])
+    cat ("level_num ", level_num, "corresponds to ", level, "\n")
+
+    write.table(covar_for_bin, file = paste0(output_prefix, "covariates.", covar_name, "_", level_num, ".txt"), sep = "\t", quote = F, col.names = NA)
+    write.table(expr_summary_for_bin, file = paste0(output_prefix, "expression_summary.", covar_name, "_", level_num, ".txt"), sep = "\t", quote = F, col.names = NA)
     
-    write.table(covar_for_bin, file = paste0(output_prefix, "covariates.", covar_name, "_", level, ".txt"), sep = "\t", quote = F, col.names = NA)
-    write.table(expr_summary_for_bin, file = paste0(output_prefix, "expression_summary.", covar_name, "_", level, ".txt"), sep = "\t", quote = F, col.names = NA)
-    
+    level_num <- level_num + 1
   }
 } else {
   q1 <- quantile(covars[,covar_name], probs = 0.25)
@@ -62,10 +66,12 @@ if (pheno_is_factor){
   expr_summary_q1 <- exp_summary(norm_expression[row.names(covars_q1), ])
   expr_summary_q3 <- exp_summary(norm_expression[row.names(covars_q3), ])
   
-  write.table(covars_q1, file = paste0(output_prefix, "covariates.", covar_name, ".q1.txt"), sep = "\t", quote = F, col.names = NA)
-  write.table(covars_q3, file = paste0(output_prefix, "covariates.", covar_name, ".q3.txt"), sep = "\t", quote = F, col.names = NA)
+  cat ("level_num 1 corresponds to the first quartile, level_num 2 - to the third quartile \n")
 
-  write.table(expr_summary_q1, file = paste0(output_prefix, "expression_summary.", covar_name, ".q1.txt"), sep = "\t", quote = F, col.names = NA)
-  write.table(expr_summary_q3, file = paste0(output_prefix, "expression_summary.", covar_name, ".q3.txt"), sep = "\t", quote = F, col.names = NA)
+  write.table(covars_q1, file = paste0(output_prefix, "covariates.", covar_name, "_1.txt"), sep = "\t", quote = F, col.names = NA)
+  write.table(covars_q3, file = paste0(output_prefix, "covariates.", covar_name, "_2.txt"), sep = "\t", quote = F, col.names = NA)
+
+  write.table(expr_summary_q1, file = paste0(output_prefix, "expression_summary.", covar_name, "_1.txt"), sep = "\t", quote = F, col.names = NA)
+  write.table(expr_summary_q3, file = paste0(output_prefix, "expression_summary.", covar_name, "_2.txt"), sep = "\t", quote = F, col.names = NA)
 }
                                                                                                                                                                                                                    

@@ -48,10 +48,10 @@ def helpMessage() {
 }
 
 
-params.bfile = ''
-//params.vcf_dir = ''
+//params.bfile = ''
+params.vcf_dir = ''
 params.bgen_dir = ''
-//params.bfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/output//chr2_v2"
+params.bfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/output//chr2"
 params.vcf_dir = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/postimpute/"
 //params.bgen_dir = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/output/"
 
@@ -123,6 +123,7 @@ if (params.bgen_dir != '') {
 
 include { PREPARE_COVARIATES; PrepareAnnotation; NormalizeExpression; NormalizeExpressionV2; ConvertVcfToBgen; ConvertVcfToPlink; MergePlinkPerChr } from './modules/prepare_data.nf'
 include { IeQTLmappingPerSNPGene; IeQTLmappingPerGene; IeQTLmappingPerGeneNoChunks; IeQTLmappingPerGeneBgen } from './modules/interaction_analysis.nf'
+include { RUN_STRATIFIED_ANALYSIS; RunEqtlMappingPerGenePlink } from './modules/stratified_analysis.nf'
 
 /* 
  * Analysis
@@ -133,9 +134,9 @@ workflow {
      * Prepare expression and covariate data
      */
     //NormalizeExpression(raw_expr_ch, params.platform, gte_ch, Channel.fromPath(params.check_sex), Channel.fromPath(params.geno_fam) )
-    NormalizeExpressionV2(raw_expr_ch, filt_exp_ch, params.platform, gte_ch )
-    norm_exp_ch = NormalizeExpressionV2.out.norm_expression_table
-
+    //NormalizeExpressionV2(raw_expr_ch, filt_exp_ch, params.platform, gte_ch )
+    //norm_exp_ch = NormalizeExpressionV2.out.norm_expression_table
+    norm_exp_ch = filt_exp_ch
     //covariates_ch = PREPARE_COVARIATES(params.platform, raw_expr_ch, norm_exp_ch, params.signature_matrix_name, params.deconvolution_method,covars_ch, gene_lengths_ch, annotation_ch, params.genotype_pcs, params.gte)
     covariates_ch = Channel.fromPath("/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/output/covariates.combined.txt")
     
@@ -159,17 +160,22 @@ workflow {
     } else { // Plink genotypes
       */
 
-      if (params.bfile == '') {
-        ConvertVcfToPlink(chr_vcf_pairs)
-        MergePlinkPerChr(ConvertVcfToPlink.out.bfile_per_chr_ch.collect().view())
-      }
-      eqtl_ch = norm_exp_ch.combine(MergePlinkPerChr.out.bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test)).combine(chunk_ch.map { it[1] })
-      results_ch = IeQTLmappingPerGene(eqtl_ch)
+      //if (params.bfile == '') {
+      //  ConvertVcfToPlink(chr_vcf_pairs)
+      //  MergePlinkPerChr(ConvertVcfToPlink.out.bfile_per_chr_ch.collect().view())
+      //}
+      //eqtl_ch = norm_exp_ch.combine(MergePlinkPerChr.out.bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test)).combine(chunk_ch.map { it[1] })
+      //results_ch = IeQTLmappingPerGene(eqtl_ch)
 
       //run without chunks:
       //eqtl_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test))
       //results_ch = IeQTLmappingPerGeneNoChunks(eqtl_ch)
 
+
+      /*
+       * Stratified analysis 
+       */
+       RUN_STRATIFIED_ANALYSIS(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, gte_ch, chunk_ch)
     //}
     
 }
