@@ -2,6 +2,7 @@
 nextflow.enable.dsl = 2
 
 process StratifyData {
+    label "medium2"
     publishDir params.outdir, mode: 'copy'
     input:
         path (combined_covariates)
@@ -17,6 +18,7 @@ process StratifyData {
 }
 
 process RunEqtlMappingPerGenePlink{
+    label "long"
     tag "Chunk: $chunk"
     echo true
 
@@ -29,15 +31,20 @@ process RunEqtlMappingPerGenePlink{
 
     shell:
     '''
-     geno=!{bed}
-     plink_base=${geno%.bed}
-     covar=!{covariates}
-     tmp=${covar##*covariates.}
-     outdir=${PWD}/limix_out_${tmp%.txt}/
-     echo $outdir
-     mkdir $outdir
+    geno=!{bed}
+    plink_base=${geno%.bed}
+    covar=!{covariates}
+    tmp=${covar##*covariates.}
+    outdir=${PWD}/limix_out_${tmp%.txt}/
+    echo $outdir
+    mkdir $outdir
 
-     python /limix_qtl/Limix_QTL/run_QTL_analysis.py \
+    awk 'BEGIN {OFS="\\t"}; {print $2, $2}' !{fam} > gte.txt
+
+    eval "$(conda shell.bash hook)"
+    conda activate py39
+
+    python /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_limix/limix_qtl/Limix_QTL/run_QTL_analysis.py \
      --plink ${plink_base} \
       -af !{limix_annotation} \
       -cf !{covariates} \
@@ -49,9 +56,11 @@ process RunEqtlMappingPerGenePlink{
       -c -gm gaussnorm \
       -w 1000000 \
       -hwe 0.0001 \
-      -gr !{chunk}
+      -gr !{chunk} \
+      -smf gte.txt
       
-      echo !{params.outdir}
+      #ls ${outdir}
+
       if [ ! -d !{params.outdir}/limix_out_${tmp%.txt}/ ]
       then
         mkdir !{params.outdir}/limix_out_${tmp%.txt}/
@@ -74,12 +83,13 @@ workflow RUN_STRATIFIED_ANALYSIS {
         covariates
         limix_annotation
         gte
+        genes_to_test_ch
         chunk
 
     main:
         covar_to_test_ch = Channel.of(params.covariate_to_test)
         StratifyData(covariates, covar_to_test_ch, norm_expression)
-        RunEqtlMappingPerGenePlink(norm_expression.combine(plink_geno).combine(StratifyData.out.strat_covariates_ch.flatten()).combine(limix_annotation).combine(gte).combine(Channel.fromPath(params.genes_to_test)).combine(covar_to_test_ch).combine(chunk.map { it[1] }).view())
+        RunEqtlMappingPerGenePlink(norm_expression.combine(plink_geno).combine(StratifyData.out.strat_covariates_ch.flatten()).combine(limix_annotation).combine(gte).combine(genes_to_test_ch).combine(covar_to_test_ch).combine(chunk.map { it[1] }))
         
     //emit:
     //    RunEqtlMappingPerGenePlink.out

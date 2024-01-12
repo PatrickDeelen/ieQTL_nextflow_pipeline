@@ -1,4 +1,5 @@
 library(data.table)
+library(caret)
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -49,8 +50,12 @@ if (pheno_is_factor){
   level_num = 1
   for (level in unique(covars[,covar_name])){
     covar_for_bin <- covars[covars[,covar_name] == level,]
-    expr_summary_for_bin <- exp_summary(norm_expression[row.names(covar_for_bin), ])
+    expr_summary_for_bin <- exp_summary(norm_expression[,row.names(covar_for_bin) ])
     cat ("level_num ", level_num, "corresponds to ", level, "\n")
+
+    # Remove covariates with near zero variance
+    near_zero_var <- nearZeroVar(covar_for_bin,  uniqueCut = 5)
+    covar_for_bin <- covar_for_bin[, -near_zero_var]
 
     write.table(covar_for_bin, file = paste0(output_prefix, "covariates.", covar_name, "_", level_num, ".txt"), sep = "\t", quote = F, col.names = NA)
     write.table(expr_summary_for_bin, file = paste0(output_prefix, "expression_summary.", covar_name, "_", level_num, ".txt"), sep = "\t", quote = F, col.names = NA)
@@ -63,8 +68,14 @@ if (pheno_is_factor){
   covars_q1 <- covars[covars[,covar_name] < q1,]
   covars_q3 <- covars[covars[,covar_name] > q3,]
   
-  expr_summary_q1 <- exp_summary(norm_expression[row.names(covars_q1), ])
-  expr_summary_q3 <- exp_summary(norm_expression[row.names(covars_q3), ])
+  #Remove covariates with near zero variance
+  near_zero_var_q1 <- nearZeroVar(covars_q1,  uniqueCut = 5)
+  covars_q1 <- covars_q1[, -near_zero_var_q1]
+  near_zero_var_q3 <- nearZeroVar(covars_q3,  uniqueCut = 5)
+  covars_q3 <- covars_q3[, -near_zero_var_q3]
+
+  expr_summary_q1 <- exp_summary(norm_expression[,row.names(covars_q1) ])
+  expr_summary_q3 <- exp_summary(norm_expression[,row.names(covars_q3) ])
   
   cat ("level_num 1 corresponds to the first quartile, level_num 2 - to the third quartile \n")
 

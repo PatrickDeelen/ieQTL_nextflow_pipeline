@@ -1,5 +1,5 @@
 library(data.table)
-library(preprocessCore)
+library(preprocessCore, lib.loc = '/groups/umcg-lld/tmp01/other-users/umcg-dzhernakova/R/x86_64-pc-linux-gnu-library/4.0.3/')
 library(edgeR)
 library(ggplot2)
 library(optparse)
@@ -351,15 +351,18 @@ gte <- fread(args$genotype_to_expression_linking, header = FALSE,
 gte$V1 <- as.character(gte$V1)
 gte$V2 <- as.character(gte$V2)
 
-filtered_expr <- fread(args$norm_expression_matrix, header = TRUE,
-                  keepLeadingZeros = TRUE)
-colnames(filtered_expr) <- as.character(colnames(filtered_expr))
-colnames(filtered_expr)[1] <- "Feature"
-samples_to_include <- colnames(filtered_expr)
+filtered_expr <- read.delim(args$norm_expression_matrix, header = TRUE, row.names = 1, sep = "\t", as.is = T, check.names = F)
+
+samples_to_include <- row.names(filtered_expr)
+if (nrow(filtered_expr) > ncol(filtered_expr)) { # if samples in columns
+   samples_to_include <- colnames(filtered_expr)
+}
 
 gte <- gte[gte$V1 %in% samples_to_include, ]
 
+
 and <- and[, colnames(and) %in% c("Feature", gte$V2), with = FALSE]
+message(paste("After keeping only the same samples as in the eQTLGen normalized matrix:", nrow(and), "genes/probes and ", ncol(and), "samples"))
 
 if (nrow(and) < 100){stop("Less than 100 samples overlap with QCd genotype data!")}
 if (!args$platform %in% c("HT12v3", "HT12v4", "HuRef8", "RNAseq", "AffyU219", "AffyHumanExon", "RNAseq_HGNC")){stop("Platform has to be one of HT12v3, HT12v4, HuRef8, RNAseq, AffyU291, AffyHuEx, RNAseq_HGNC")}

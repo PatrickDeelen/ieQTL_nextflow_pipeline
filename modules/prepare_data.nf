@@ -10,6 +10,7 @@ nextflow.enable.dsl = 2
  */
 process TMM {
     tag "TMM normalization"
+    label "short"
     //publishDir params.outdir, mode: 'copy'
 
     input:
@@ -30,24 +31,22 @@ process TMM {
  */
 process TPM {
     tag "TPM normalization"
+    label "short"
 
     input:
     path raw_expression
     path gene_lengths
-    path limix_annotation
-    val exp_platform
+
 
     output:
     path "*.TPM.txt.gz"
 
     script:
     """
-    Rscript $projectDir/bin/normalize_TPM_and_rename.R \
+    Rscript $projectDir/bin/normalize_TPM.R \
         ${raw_expression} \
         ${gene_lengths} \
-        $limix_annotation \
-        expression.TPM.txt \
-        $exp_platform
+        expression.TPM.txt 
         
     gzip -f expression.TPM.txt
     """
@@ -58,6 +57,8 @@ process TPM {
  */
 process Deconvolution {
     tag "deconvolution"
+    label "medium1"
+
     publishDir params.outdir, mode: 'copy'
     
     input:
@@ -85,8 +86,9 @@ process Deconvolution {
  * Combine major covariates with cell counts, genotype PCs and RNA-quality
  */
 process CombineCovariatesRNAqual {
+    label "medium1"
+
     publishDir params.outdir, mode: 'copy'
-    tag "combine covars rnaqual"
 
     input:
     path general_covariates
@@ -110,8 +112,9 @@ process CombineCovariatesRNAqual {
  * Combine major covariates with cell counts, genotype PCs
  */
 process CombineCovariates {
+    label "medium1"
+
     publishDir params.outdir, mode: 'copy'
-    tag "combine covars rnaqual"
 
     input:
     path general_covariates
@@ -137,7 +140,7 @@ process PrepareAnnotation {
     path gtf_annotation
 
     output:
-    	path ("LimixAnnotationFile.txt"), emit: annotation_ch 
+    path ("LimixAnnotationFile.txt"), emit: annotation_ch 
 	path ("GeneLengths.txt"), emit: gene_lengths_ch
 	path ("ChunkingFile.txt"), emit: chunks_ch
 
@@ -149,6 +152,8 @@ process PrepareAnnotation {
 
 
 process CalculateRNAQualityScore {
+    label "short"
+    
     input:
     path tmm_expression_data
     
@@ -162,7 +167,7 @@ process CalculateRNAQualityScore {
 
 }
 
-process NormalizeExpression {
+process NormalizeExpressionOld {
     publishDir params.outdir, mode: 'copy'
     input:
       path(raw_expr)
@@ -207,7 +212,9 @@ process NormalizeExpression {
     '''
 }
 
-process NormalizeExpressionV2 {
+process NormalizeExpression {
+    label "medium2"
+    echo true
     publishDir params.outdir, mode: 'copy'
     input:
       path(raw_expr)
@@ -236,8 +243,7 @@ process NormalizeExpressionV2 {
         elif [[ !{exp_platform} == "RNAseq_HGNC" ]]; then
             probe_mapping_file=!{baseDir}/data/HgncToEnsemblProbeMatching.txt
         fi
-        echo $probe_mapping_file
-        
+                
         outdir=${PWD}/outputfolder_exp/
 
         Rscript !{baseDir}/bin/ProcessExpression_v2.R \
@@ -250,6 +256,8 @@ process NormalizeExpressionV2 {
     '''
 }
 process SplitCovariates {
+    label "medium1"
+
     publishDir params.outdir, mode: 'copy'
     input:
     path normalized_expression_data
@@ -267,9 +275,12 @@ process SplitCovariates {
 
 }
 
+
 process ConvertVcfToBgen {
-    echo true
-    publishDir params.outdir, mode: 'copy'
+    label "medium2"
+
+    //echo true
+    //publishDir params.outdir, mode: 'copy'
     input:
         tuple val(chr), path(vcf_file)
 
@@ -283,7 +294,9 @@ process ConvertVcfToBgen {
 }
 
 process ConvertVcfToPlink {
-    echo true
+    label "medium1"
+
+    //echo true
     //publishDir params.outdir, mode: 'copy'
     input:
         tuple val(chr), path(vcf_file)
@@ -293,6 +306,7 @@ process ConvertVcfToPlink {
     
     script:
     """
+        ml PLINK
         plink2 --vcf $vcf_file --make-bed --out chr${chr} --chr $chr
         echo "in convert"
         ls -l
@@ -300,7 +314,9 @@ process ConvertVcfToPlink {
 }
 
 process MergePlinkPerChr {
-    echo true
+    label "medium2"
+
+    //echo true
     input:
         path(plink_files)
     output:
@@ -335,9 +351,9 @@ workflow PREPARE_COVARIATES {
 	    gte
 
     main:
-	signature_matrix = "$projectDir/data/signature_matrices/" + signature_matrix_name  + ".txt.gz"
+	signature_matrix = "$projectDir/data/signature_matrices/" + signature_matrix_name  + "_ensg.txt.gz"
 	if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") {
-	    cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths, limix_annotation, exp_type), signature_matrix, deconvolution_method, exp_type)
+	    cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths), signature_matrix, deconvolution_method, exp_type)
         rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
 	    CombineCovariatesRNAqual(covariates,cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
 	    covariates_ch = CombineCovariatesRNAqual.out.covariates_ch

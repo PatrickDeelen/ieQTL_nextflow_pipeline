@@ -3,6 +3,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(patchwork)
+library(caret)
 
 option_list <- list(
   make_option(c("-s", "--general_covs"), type = "character",
@@ -60,6 +61,10 @@ covar$Row.names = NULL
 covar <- covar[,colSums(is.na(covar)) < nrow(covar)]
 covar <- na.omit(covar)
 
+# Remove covariates with near zero variance
+near_zero_var <- nearZeroVar(covar,  uniqueCut = 5)
+covar <- covar[, -near_zero_var]
+
 
 #contin_covars <-  apply(covar, 2, function(x) length(unique(x)) > 3)
 covar_names_for_INT <- names(which(apply(covar, 2, function(x) length(unique(x)) > 3)))
@@ -95,7 +100,6 @@ if (! is.null(args$rna_qual)){
   cat("Number of samples with covariate data available:", nrow(covar_merged), "\n")
   
 }
-
 
 # run INT on general covariates, cell counts and RNA quality
 covar_merged_int <- cbind(covar_merged[, !colnames(covar_merged) %in% covar_names_for_INT], apply(covar_merged[,covar_names_for_INT], 2, function(x) qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x))) ))

@@ -37,18 +37,27 @@ gtfInfo = gtfInfo[which(gtfInfo$V1 %in% c(1:22,"X","MT", "M","Y")),]
 
 ##Extend matrix with relevant entries.
 partialMatrix = strsplit(gtfInfo$V9,split = "; ")
-
 ensgIdLoc = which(startsWith(partialMatrix[[1]],"gene_id"))
 gtfInfo["ENSG"] = gsub( "gene_id ","",unlist(lapply(partialMatrix,"[[",ensgIdLoc)))
 nameLoc = which(startsWith(partialMatrix[[1]],"gene_name"))
 gtfInfo["Gene_Name"] = gsub( "gene_name ","",unlist(lapply(partialMatrix,"[[",nameLoc)))
+
+# If there is no gene_name field, put gene id instead
+gtfInfo[startsWith(gtfInfo$Gene_Name, "gene_source"), "Gene_Name"] <- gtfInfo[startsWith(gtfInfo$Gene_Name, "gene_source"), "ENSG"]
+
+
+# If not working use:
+# library(rtracklayer)
+# gtfInfo <- readGFF(opt$in_gtf)
+#
+
 if(opt$biotype_flag!="NA"){
 	btLoc = which(startsWith(partialMatrix[[1]],opt$biotype_flag))
 	gtfInfo["biotype"] = gsub(paste(opt$biotype_flag," ",sep=""),"",unlist(lapply(partialMatrix,"[[",btLoc)))
 } else {
 	gtfInfo["biotype"] = NA
 }
-
+print(head(gtfInfo))
 
 if(opt$feature_name=="ENSG"){
   geneInfo = gtfInfo[,c(10,1,4,5,11,12)]
@@ -113,4 +122,5 @@ txdb <- makeTxDbFromGFF(opt$in_gtf,format="gtf")
 exons.list.per.gene <- exonsBy(txdb,by="gene")
 # then for each gene, reduce all the exons to a set of non overlapping exons, calculate their lengths (widths) and sum then
 exonic.gene.sizes <- sum(width(reduce(exons.list.per.gene)))
-write.table(exonic.gene.sizes,paste0(opt$out_dir,"/GeneLengths.txt"),quote = F,sep="\t",col.names=F)
+
+write.table(exonic.gene.sizes,paste0(opt$out_dir,"/GeneLengths_ensg.txt"),quote = F,sep="\t",col.names=F)
