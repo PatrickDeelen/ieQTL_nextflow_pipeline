@@ -54,25 +54,15 @@ params.bgen_dir = ''
 //params.vcf_dir = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/postimpute/"
 //params.bgen_dir = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/output/"
 
-
-params.raw_expfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/expression_data.all.txt.gz"
-//params.raw_expfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/expression_data.txt"
-params.norm_expfile = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/exp_data_preprocessed2.txt"
-params.covariates = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/v2/LLD_age_sex.txt"
-
-params.gte = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/LLD_gte.txt"
-params.outdir = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/output/"
-params.covariate_to_test = "gender_F1M2"
-params.genes_to_test = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/genes_to_test.txt"
-
-params.genotype_pcs = "/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/input/LLD_PCs.txt"
-
-params.exp_platform = "RNAseq"
-params.cohort_name = "LLD"
+params.genes_to_test = ''
+params.qtls_to_test = ''
+params.preadjust = false
+params.num_expr_PCs = 25
 params.signature_matrix_name = "LM22"
-params.deconvolution_method = "nnls"
+params.deconvolution_method = "dtangle"
 params.num_perm = 0
 
+params.run_stratified = false
 params.plink2_executable = "plink2"
 /*
  * Channel declarations
@@ -87,8 +77,10 @@ gte_ch = Channel.fromPath(params.gte)
 annotation_ch = Channel.fromPath("$projectDir/data/LimixAnnotationFile.GRCh38.110.txt.gz")
 gene_lengths_ch = Channel.fromPath("$projectDir/data/GeneLengths_GRCh38.110_ensg.txt.gz")
 
+//Channel.fromPath(params.genes_to_test).set { genes_to_test_ch } 
+
 Channel
-    .fromPath("$projectDir/data/ChunkingFile.GRCh38.110.txt")
+    .fromPath(params.chunk_file)
     .splitCsv( header: false )
     .map { row -> tuple(row[0].split(':')[0], row[0]) }
     .set { chunk_ch }
@@ -116,7 +108,8 @@ if (params.bgen_dir != '') {
 
 
 include { PREPARE_COVARIATES; PrepareAnnotation; NormalizeExpression; ConvertVcfToBgen; ConvertVcfToPlink; MergePlinkPerChr } from './modules/prepare_data.nf'
-include { IeQTLmappingPerSNPGene; IeQTLmappingPerGene; IeQTLmappingPerGeneNoChunks; IeQTLmappingPerGeneBgen; FilterGenesToTest } from './modules/interaction_analysis.nf'
+//include { IeQTLmappingPerGeneTMP; IeQTLmappingPerSNPGene; IeQTLmappingPerGene; IeQTLmappingPerGeneNoChunks; IeQTLmappingPerGeneBgen; FilterGenesToTest } from './modules/interaction_analysis.nf'
+include { RUN_INTERACTION_QTL_MAPPING; IeQTLmapping; IeQTLmapping_InteractionCovariates; SplitCovariates; PreadjustExpression } from './modules/interaction_analysis2.nf'
 include { RUN_STRATIFIED_ANALYSIS; RunEqtlMappingPerGenePlink } from './modules/stratified_analysis.nf'
 
 /* 
@@ -174,24 +167,18 @@ workflow {
       //bfile_ch.view()
       /*
        * Run interaction analysis
-       */
-      //FilterGenesToTest(Channel.fromPath(params.genes_to_test).combine(norm_exp_ch))
-      //FilterGenesToTest.out.set{genes_to_test_ch}
-
-      Channel.fromPath(params.genes_to_test).set { genes_to_test_ch } 
-      interaction_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(genes_to_test_ch).combine(Channel.of(params.covariate_to_test)).combine(chunk_ch.map { it[1] })
-
-      results_ch = IeQTLmappingPerGene(interaction_ch)
-
-      //run without chunks:
-      //eqtl_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test))
-      //results_ch = IeQTLmappingPerGeneNoChunks(eqtl_ch)
-
+       */      
+      
+      //interaction_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(genes_to_test_ch).combine(Channel.of(params.covariate_to_test)).combine(chunk_ch.map { it[1] })
+      //results_ch = IeQTLmappingPerGene(interaction_ch)
+      RUN_INTERACTION_QTL_MAPPING(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, Channel.of(params.covariate_to_test), chunk_ch.map { it[1] })
 
       /*
        * Stratified analysis 
        */
-       RUN_STRATIFIED_ANALYSIS(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, gte_ch, genes_to_test_ch, chunk_ch)
+       if (params.run_stratified){
+        RUN_STRATIFIED_ANALYSIS(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, gte_ch, genes_to_test_ch, chunk_ch)
+       }
     //}
     
 }

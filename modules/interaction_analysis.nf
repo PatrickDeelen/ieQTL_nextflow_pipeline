@@ -54,12 +54,31 @@ process IeQTLmappingPerSNPGene {
     '''
 }
 
+
+process IeQTLmappingPerGeneTMP {
+    label "long"
+
+    tag "Chunk: $chunk"
+    echo true
+
+    input:
+    tuple path(tmm_expression), path(bed), path(bim), path(fam), path(covariates), path(limix_annotation), path(gte), path(genes_to_test), val(covariate_to_test), val(chunk)
+
+
+    output:
+
+    shell:
+    '''
+    echo "Running chunk !{chunk}"
+    '''
+}
+
 /*
  * run QTL mapping for all SNPs arounnd the specified Gene for a given chunk
  */
 process IeQTLmappingPerGene {
-    label "long"
-
+    label "verylong"
+    errorStrategy 'ignore'
     tag "Chunk: $chunk"
     //echo true
 
@@ -91,13 +110,14 @@ process IeQTLmappingPerGene {
     -ff !{genes_to_test} \
     -od ${outdir} \
     --interaction_term !{covariate_to_test} \
-    -np 0 \
+    -np 20 \
     -maf 0.05 \
     -c -gm gaussnorm \
     -w 1000000 \
     -hwe 0.0001 \
     -gr !{chunk} \
-    -smf gte.txt
+    -smf gte.txt \
+    --write_permutations --write_zscore
     
     
     if [ ! -d !{params.outdir}/limix_output/ ]

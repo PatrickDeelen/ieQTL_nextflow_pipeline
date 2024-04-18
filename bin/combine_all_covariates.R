@@ -8,7 +8,7 @@ library(caret)
 option_list <- list(
   make_option(c("-s", "--general_covs"), type = "character",
               help = "Path to the covariate file with sex and age. Sample ids = genotype ids."),
-  make_option(c("-c", "--cell_counts"), type = "character",
+  make_option(c("-c", "--cell_counts"), type = "character", default = NULL,
               help = "Path to the covariate file with (deconvoluted) cell counts. Sample ids - expression ids."),
   make_option(c("-g", "--genotype_pcs"), type = "character", default = NULL,
               help = "Path to the covariate file with genotype PCs. Sample ids = genotype ids."),
@@ -46,24 +46,33 @@ run_INT <- function(d){
   return(d_int)
 }
 
-# Combine general covariates with cell counts
+# Combine general covariates with cell counts if they are provided
 
-covar_main <- read.delim(args$general_covs, check.names = F, header = T, row.names = 1, as.is = T, sep ="\t")
-covar_cell_counts <- read.delim(args$cell_counts, check.names = F, header = T, row.names = 1, as.is = T, sep ="\t")
+covar_main <- as.data.frame(read.delim(args$general_covs, check.names = F, header = T, row.names = 1, as.is = T, sep ="\t"))
 gte <- read.delim(args$gte, check.names = F, header = F, as.is = T, sep ="\t")
 #covar_main <- rename_samples(covar_main, gte)
-covar_cell_counts <- rename_samples(covar_cell_counts, gte, key_col = 2, value_col = 1)
 
-covar <- merge(covar_main, covar_cell_counts, by = 0)
-row.names(covar) <- covar$Row.names
-covar$Row.names = NULL
+if (! is.null(args$cell_counts) && args$cell_counts != "NA"){
+  covar_cell_counts <- read.delim(args$cell_counts, check.names = F, header = T, row.names = 1, as.is = T, sep ="\t")
+  covar_cell_counts <- rename_samples(covar_cell_counts, gte, key_col = 2, value_col = 1)
+  covar <- merge(covar_main, covar_cell_counts, by = 0)
+  row.names(covar) <- covar$Row.names
+  covar$Row.names = NULL
+  cat("Combined major covariates with cell counts\n")
 
-covar <- covar[,colSums(is.na(covar)) < nrow(covar)]
+} else {
+  covar <- covar_main
+  cat("No cell counts provided!\n")
+
+}
+
+
+covar <- covar[,colSums(is.na(covar)) < nrow(covar), drop = F]
 covar <- na.omit(covar)
 
 # Remove covariates with near zero variance
 near_zero_var <- nearZeroVar(covar,  uniqueCut = 5)
-covar <- covar[, -near_zero_var]
+if (length(near_zero_var) > 0) covar <- covar[, -near_zero_var]
 
 
 #contin_covars <-  apply(covar, 2, function(x) length(unique(x)) > 3)
@@ -87,6 +96,7 @@ cat("Added genotype PCs\n")
 cat ("Number of covariates in the combined file:", ncol(covar_merged), "\n")
 cat("Number of samples with covariate data available:", nrow(covar_merged), "\n")
 
+
 if (! is.null(args$rna_qual)){
   rna_qual <- read.delim(args$rna_qual, check.names = F, header = T, row.names = 1, as.is = T)
   #rna_qual <- rename_samples(rna_qual, gte)
@@ -102,7 +112,7 @@ if (! is.null(args$rna_qual)){
 }
 
 # run INT on general covariates, cell counts and RNA quality
-covar_merged_int <- cbind(covar_merged[, !colnames(covar_merged) %in% covar_names_for_INT], apply(covar_merged[,covar_names_for_INT], 2, function(x) qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x))) ))
+covar_merged_int <- cbind(covar_merged[, !colnames(covar_merged) %in% covar_names_for_INT], apply(covar_merged[,covar_names_for_INT, drop = F], 2, function(x) qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x))) ))
 colnames(covar_merged_int) <- c(colnames(covar_merged[, !colnames(covar_merged) %in% covar_names_for_INT]), covar_names_for_INT)
 
 # Plot covariate distributions prior to INT

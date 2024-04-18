@@ -27,7 +27,9 @@ raw_exp_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex
 gte_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/data/${c}/${c}.gte
 norm_exp_path=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/1_DataQC/out/${c}/outputfolder_exp/exp_data_QCd/exp_data_preprocessed.txt
 covariate_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/BIOS_covariates.txt
+
 genotype_pcs_path=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/1_DataQC/out/${c}/outputfolder_gen/gen_PCs/GenotypePCs.txt
+expression_pcs_path=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/1_DataQC/out/${c}/outputfolder_exp/exp_PCs/exp_PCs.txt
 
 exp_platform=RNAseq
 cohort_name=$c
@@ -37,6 +39,7 @@ genes_to_test=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-se
 output_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/results/${c}/
 
 # Additional settings and optional arguments for the command
+chunk_file=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/ieQTL_nextflow_pipeline/data/ChunkingFile.GRCh38.110.100genes.txt
 
 
 # Command:
@@ -51,6 +54,9 @@ NXF_VER=21.10.6 nextflow run /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/outpu
 --covariate_to_test $covariate_to_test \
 --genes_to_test $genes_to_test \
 --genotype_pcs $genotype_pcs_path \
+--expr_pcs $expression_pcs_path \
+--chunk_file $chunk_file \
 --outdir ${output_path}  \
+--run_stratified false \
 -profile slurm,singularity \
 -resume
