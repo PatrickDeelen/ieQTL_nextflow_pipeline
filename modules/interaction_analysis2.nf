@@ -13,14 +13,14 @@ process IeQTLmapping {
     
 
     output:
-    //path "limix_out/*"
+    path "limix_out/*"
 
     shell:
     '''
     geno=!{bed}
     plink_base=${geno%.bed}
     outdir=${PWD}/limix_out/
-    mkdir $outdir
+    mkdir -p $outdir
 
     awk 'BEGIN {OFS="\\t"}; {print $2, $2}' !{fam} > gte.txt
 
@@ -35,9 +35,11 @@ process IeQTLmapping {
 
     #python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
 
-    eval "$(conda shell.bash hook)"
-    conda activate py39
-    python /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_limix/limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
+    #eval "$(conda shell.bash hook)"
+    #conda activate py39
+    #python /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_limix/limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
+    
+    python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
      --plink ${plink_base} \
       -af !{limix_annotation} \
       -cf !{covariates} \
@@ -103,9 +105,10 @@ process IeQTLmapping_InteractionCovariates {
 
     #python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
 
-    eval "$(conda shell.bash hook)"
-    conda activate py39
-    python /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_limix/limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
+    #eval "$(conda shell.bash hook)"
+    #conda activate py39
+    #python /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_limix/limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
+    python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
      --plink ${plink_base} \
       -af !{limix_annotation} \
       -cf !{interaction_covariates} \
@@ -193,8 +196,32 @@ process PreadjustExpression {
     '''
 }
 
-workflow RUN_INTERACTION_QTL_MAPPING {
+process ConvertIeQTLsToText {
+    echo true
+
+    input:
+    path limix_out_files
     
+    output:
+    
+
+    script:
+    """
+    mkdir limix_out_text/
+    cp $limix_out_files limix_out_text/
+    python /limix_qtl/Limix_QTL/post_processing/minimal_interaction_postprocess.py \
+      -id limix_out_text/ \
+      -od  limix_out_text/ \
+      -sfo
+    
+    gzip limix_out_text/*txt 
+    mv limix_out_text/*txt.gz ${params.outdir}/limix_output/
+
+    """
+}
+
+
+workflow RUN_INTERACTION_QTL_MAPPING {   
     take:
         tmm_expression
 	    plink_geno
@@ -217,10 +244,11 @@ workflow RUN_INTERACTION_QTL_MAPPING {
 
         interaction_ch = PreadjustExpression.out.combine(plink_geno).combine(SplitCovariates.out.interaction_covariates_ch).combine(limix_annotation).combine(covariate_to_test).combine(chunk)
       
-        results_ch = IeQTLmapping_InteractionCovariates(interaction_ch)
+        ConvertIeQTLsToText(IeQTLmapping_InteractionCovariates(interaction_ch).collect())
     } else {
       interaction_ch = tmm_expression.combine(plink_geno).combine(covariates_ch).combine(limix_annotation).combine(covariate_to_test).combine(chunk)
-      results_ch = IeQTLmapping(interaction_ch)
+      ConvertIeQTLsToText(IeQTLmapping(interaction_ch).collect())
+      
     }
 
     //emit:

@@ -356,21 +356,26 @@ workflow PREPARE_COVARIATES {
 
     main:
 	signature_matrix = "$projectDir/data/signature_matrices/" + signature_matrix_name  + "_ensg.txt.gz"
-        if (deconvolution_method == "NA") {
-	  rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data).view()
-	  CombineCovariatesRNAqual(covariates,Channel.fromPath("NA"), genotype_pcs, gte, rnaquality_ch)
+    if (deconvolution_method == "NA") {
+	      rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data).view()
+	      CombineCovariatesRNAqual(covariates,Channel.fromPath("NA"), genotype_pcs, gte, rnaquality_ch)
           covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
-	} else {
+	} else if (deconvolution_method == "lab"){
+        cell_counts_ch = Channel.fromPath(params.lab_cell_perc)
+        rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
+	    CombineCovariatesRNAqual(covariates, cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
+	    covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
+    } else {
 	  if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") {
 	    cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths), signature_matrix, deconvolution_method, exp_type)
-            rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
+        rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
 	    CombineCovariatesRNAqual(covariates,cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
 	    covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
-          } else {
+      } else {
 	    cell_counts_ch = Deconvolution(normalized_expression_data, signature_matrix, deconvolution_method, exp_type)
 	    covariates_ch = CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
-          }
-        }
+      }
+     }
     emit:
         covariates_ch
 

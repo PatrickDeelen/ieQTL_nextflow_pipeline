@@ -56,13 +56,16 @@ params.bgen_dir = ''
 
 params.genes_to_test = ''
 params.qtls_to_test = ''
-params.preadjust = false
-params.num_expr_PCs = 25
+
+params.lab_cell_perc = ''
+
 params.signature_matrix_name = "LM22"
 params.deconvolution_method = "dtangle"
 params.num_perm = 0
 
 params.run_stratified = false
+params.preadjust = false
+params.num_expr_PCs = 25
 params.plink2_executable = "plink2"
 /*
  * Channel declarations
@@ -169,15 +172,18 @@ workflow {
        * Run interaction analysis
        */      
       
-      //interaction_ch = norm_exp_ch.combine(bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(genes_to_test_ch).combine(Channel.of(params.covariate_to_test)).combine(chunk_ch.map { it[1] })
-      //results_ch = IeQTLmappingPerGene(interaction_ch)
       RUN_INTERACTION_QTL_MAPPING(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, Channel.of(params.covariate_to_test), chunk_ch.map { it[1] })
+      if (params.lab_cell_perc != ''){
+        covariates_ch = PREPARE_COVARIATES(params.exp_platform, raw_expr_ch, norm_exp_ch, params.signature_matrix_name, "lab", covars_ch, gene_lengths_ch, annotation_ch, params.genotype_pcs, params.gte)
 
+      }
+      
+      
       /*
        * Stratified analysis 
        */
        if (params.run_stratified){
-        RUN_STRATIFIED_ANALYSIS(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, gte_ch, genes_to_test_ch, chunk_ch)
+        RUN_STRATIFIED_ANALYSIS(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, gte_ch, chunk_ch)
        }
     //}
     

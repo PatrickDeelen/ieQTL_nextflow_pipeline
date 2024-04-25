@@ -23,7 +23,7 @@ process RunEqtlMappingPerGenePlink{
     echo true
 
     input:
-    tuple path(norm_expression), path(bed), path(bim), path(fam), path (covariates), path(limix_annotation), path(gte), path(genes_to_test), val(covariate_to_test), val(chunk)
+    tuple path(norm_expression), path(bed), path(bim), path(fam), path (covariates), path(limix_annotation), path(gte), val(covariate_to_test), val(chunk)
 
 
     output:
@@ -41,6 +41,7 @@ process RunEqtlMappingPerGenePlink{
 
     awk 'BEGIN {OFS="\\t"}; {print $2, $2}' !{fam} > gte.txt
 
+    genes_to_test = !{params.genes_to_test}
     eval "$(conda shell.bash hook)"
     conda activate py39
 
@@ -83,13 +84,12 @@ workflow RUN_STRATIFIED_ANALYSIS {
         covariates
         limix_annotation
         gte
-        genes_to_test_ch
         chunk
 
     main:
         covar_to_test_ch = Channel.of(params.covariate_to_test)
         StratifyData(covariates, covar_to_test_ch, norm_expression)
-        RunEqtlMappingPerGenePlink(norm_expression.combine(plink_geno).combine(StratifyData.out.strat_covariates_ch.flatten()).combine(limix_annotation).combine(gte).combine(genes_to_test_ch).combine(covar_to_test_ch).combine(chunk.map { it[1] }))
+        RunEqtlMappingPerGenePlink(norm_expression.combine(plink_geno).combine(StratifyData.out.strat_covariates_ch.flatten()).combine(limix_annotation).combine(gte).combine(covar_to_test_ch).combine(chunk.map { it[1] }))
         
     //emit:
     //    RunEqtlMappingPerGenePlink.out

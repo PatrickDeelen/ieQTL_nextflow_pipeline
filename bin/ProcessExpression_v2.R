@@ -1,5 +1,6 @@
 library(data.table)
-library(preprocessCore, lib.loc = '/groups/umcg-lld/tmp01/other-users/umcg-dzhernakova/R/x86_64-pc-linux-gnu-library/4.0.3/')
+#library(preprocessCore, lib.loc = '/groups/umcg-lld/tmp01/other-users/umcg-dzhernakova/R/x86_64-pc-linux-gnu-library/4.0.3/')
+library(preprocessCore)
 library(edgeR)
 library(ggplot2)
 library(optparse)
