@@ -9,7 +9,7 @@ process IeQTLmapping {
     //echo true
 
     input:
-    tuple path(tmm_expression), path(bed), path(bim), path(fam), path(covariates), path(limix_annotation), val(covariate_to_test), val(chunk)
+    tuple path(tmm_expression), path(bed), path(bim), path(fam), path(covariates), path(limix_annotation), val(covariate_to_test), val(chunk), path(qtl_ch)
     
 
     output:
@@ -28,9 +28,9 @@ process IeQTLmapping {
     genes=!{params.genes_to_test}
     if [ "${#qtls}" -gt 1 ]
     then 
-        arg_line="-fvf $qtls"
+        arg_line="-fvf !{qtl_ch}"
     else
-        arg_line="-ff $genes"
+        arg_line="-ff !{qtl_ch}"
     fi
 
     #python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
@@ -45,7 +45,7 @@ process IeQTLmapping {
       -cf !{covariates} \
       -pf !{tmm_expression} \
       -smf gte.txt \
-      $arg_line \
+      ${arg_line} \
       -od ${outdir} \
       --interaction_term !{covariate_to_test} \
       -gr !{chunk} \
@@ -98,9 +98,9 @@ process IeQTLmapping_InteractionCovariates {
     genes=!{params.genes_to_test}
     if [ "${#qtls}" -gt 1 ]
     then 
-        arg_line="-fvf $qtls"
+        arg_line="-fvf $qtls_ch"
     else
-        arg_line="-ff $genes"
+        arg_line="-ff $qtls_ch"
     fi
 
     #python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
@@ -153,7 +153,6 @@ process SplitCovariates {
 
     input:
     path covariates_path
-    val interaction_covariates
 
     output:
     path ("covariates_preadjust.txt"), emit: linear_covariates_ch
@@ -166,8 +165,17 @@ process SplitCovariates {
     else 
           interaction_covariates = `echo "!{params.covariate_to_test}"`
     fi
-    python !{projectDir}/bin/extract_columns_from_file.py !{covariates_path} ${interaction_covariates} covariates_interaction.txt
-    python !{projectDir}/bin/extract_columns_from_file.py !{covariates_path} ${interaction_covariates} covariates_preadjust.txt -v
+    if [ !{params.cell_perc_interactions} = false ]; then
+        python !{projectDir}/bin/extract_columns_from_file.py !{covariates_path} ${interaction_covariates} covariates_interaction.txt
+        python !{projectDir}/bin/extract_columns_from_file.py !{covariates_path} ${interaction_covariates} covariates_preadjust.txt -v
+    else 
+        cell_types=`head -1  ../../run1/results/RS/cell_counts.txt | cut -f2- | sed "s:\t:,:g"`
+        interaction_covariates2=`echo "$interaction_covariates,$cell_types"`
+
+        python !{projectDir}/bin/extract_columns_from_file.py !{covariates_path} ${interaction_covariates2} covariates_interaction.txt
+        python !{projectDir}/bin/extract_columns_from_file.py !{covariates_path} ${interaction_covariates2} covariates_preadjust.txt -v
+
+    fi
     '''
 }
 
@@ -192,7 +200,7 @@ process PreadjustExpression {
     n=!{params.num_expr_PCs}
     n2=$((n + 1))
     cut -f1-$n2 !{pcs_path} > pcs.txt
-    Rscript !{projectDir}/bin/regress_linear_covariates.R !{expression_path} !{covariates_path} ./ pcs.txt
+    Rscript !{x}/bin/regress_linear_covariates.R !{expression_path} !{covariates_path} ./ pcs.txt
     '''
 }
 
@@ -220,7 +228,19 @@ process ConvertIeQTLsToText {
     """
 }
 
+process GetTopIeQTLs {
+    echo true
 
+    input:
+    path limix_folder
+    
+    output:
+    
+
+    script:
+    """
+    """
+}
 workflow RUN_INTERACTION_QTL_MAPPING {   
     take:
         tmm_expression
@@ -229,28 +249,23 @@ workflow RUN_INTERACTION_QTL_MAPPING {
 	    limix_annotation
         covariate_to_test
 	    chunk
-        
+        qtl_ch
 
     main:
 
-    if (params.preadjust){
-        if (params.exp_platform == "RNAseq" || params.exp_platform == "RNAseq_HGNC") {
-          interaction_covariates = Channel.of(println("AvgExprCorrelation" + ',' + covariate_to_test))
-        } else {
-          interaction_covariates = Channel.of(covariate_to_test)
-        }
-        SplitCovariates(covariates_ch, interaction_covariates)
+    
+    if (params.preadjust){            
+        SplitCovariates(covariates_ch)
         PreadjustExpression(tmm_expression, SplitCovariates.out.linear_covariates_ch, params.expr_pcs)
 
         interaction_ch = PreadjustExpression.out.combine(plink_geno).combine(SplitCovariates.out.interaction_covariates_ch).combine(limix_annotation).combine(covariate_to_test).combine(chunk)
-      
         ConvertIeQTLsToText(IeQTLmapping_InteractionCovariates(interaction_ch).collect())
     } else {
-      interaction_ch = tmm_expression.combine(plink_geno).combine(covariates_ch).combine(limix_annotation).combine(covariate_to_test).combine(chunk)
-      ConvertIeQTLsToText(IeQTLmapping(interaction_ch).collect())
-      
-    }
-
+        interaction_ch = tmm_expression.combine(plink_geno).combine(covariates_ch).combine(limix_annotation).combine(covariate_to_test).combine(chunk).combine(qtl_ch)
+        ConvertIeQTLsToText(IeQTLmapping(interaction_ch).collect())
+    
+    }   
+    
     //emit:
     //    results_ch
 

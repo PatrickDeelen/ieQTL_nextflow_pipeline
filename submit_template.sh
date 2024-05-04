@@ -21,7 +21,7 @@ set -f
 c=NTR_GoNL
 # Genotype data
 #[full path to the folder with imputed filtered vcf files produced by eQTLGen pipeline 2_Imputation step (postimpute folder)]
-#vcf_dir_path=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/2_Imputation/out/${c}/postimpute/
+vcf_dir_path=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/2_Imputation/out/${c}/postimpute/
 bfile=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/data/${c}/chr2.flt
 raw_exp_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/data/${c}/${c}_raw_expression.txt.gz
 gte_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/data/${c}/${c}.gte
@@ -35,7 +35,7 @@ exp_platform=RNAseq
 cohort_name=$c
 genome_build="GRCh38"
 covariate_to_test=gender_F1M2
-#genes_to_test=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/bios_sign_genes.txt
+genes_to_test=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/bios_sign_genes.txt
 qtls_to_test=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_my/data/bios_sign_qtls.txt
 output_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/tmp1/results/
 
@@ -45,7 +45,7 @@ chunk_file=test_chunks.txt
 
 # Command:
 NXF_VER=21.10.6 nextflow run /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/ieQTL_nextflow_pipeline/InteractionAnalysis.nf \
---bfile $bfile \
+--vcf_dir $vcf_dir_path \
 --raw_expfile ${raw_exp_path} \
 --norm_expfile ${norm_exp_path} \
 --gte ${gte_path} \
@@ -53,12 +53,13 @@ NXF_VER=21.10.6 nextflow run /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/outpu
 --exp_platform ${exp_platform} \
 --cohort_name ${cohort_name} \
 --covariate_to_test $covariate_to_test \
---qtls_to_test $genes_to_test \
+--qtls_to_test $qtls_to_test \
 --genotype_pcs $genotype_pcs_path \
 --expr_pcs $expression_pcs_path \
 --chunk_file $chunk_file \
 --outdir ${output_path}  \
 --run_stratified false \
 --preadjust false \
+--cell_perc_interactions false \
 -resume \
 -profile singularity,slurm \

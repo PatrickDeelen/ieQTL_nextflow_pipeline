@@ -9,20 +9,7 @@ def helpMessage() {
   =======================================================
   Usage:
   The typical command for running the pipeline is as follows:
-  nextflow run InteractionAnalysis.nf \
-    --bfile LLD_genotypes_flt \
-    --raw_expfile LLD_expression_data.txt.gz \
-    --norm_expfile exp_data_preprocessed.txt.gz \
-    --gte LLD_gte.txt \
-    --exp_platform RNAseq \
-    --cohort_name LLD \
-    --covariates LLD_covariates.txt \
-    --covariate_to_test gender_F1M2 \
-    --genes_to_test signif_eqtl_genes.txt \
-    --outdir LLD_interaction_res \
-    --plink2_executable plink2 \
-    -profile slurm \
-    -resume
+  
 
   Mandatory arguments:
     --cohort_name                 Name of the cohort.
@@ -38,7 +25,7 @@ def helpMessage() {
   Optional arguments
     --signature_matrix_name       Name of the signature matrix using in cell type deconvolution. Either LM22 or ABIS
     --deconvolution_method        Name of the cell type deconvolution method. Either nnls or dtangle
-    --plink2                      Plink2 executable
+    --plink                      Plink executable
     
   """.stripIndent()
 }
@@ -65,8 +52,9 @@ params.num_perm = 0
 
 params.run_stratified = false
 params.preadjust = false
+params.cell_perc_interactions = false
 params.num_expr_PCs = 25
-params.plink2_executable = "plink2"
+
 /*
  * Channel declarations
  */
@@ -120,16 +108,14 @@ include { RUN_STRATIFIED_ANALYSIS; RunEqtlMappingPerGenePlink } from './modules/
  */
 
 workflow {
+    params.each{ k, v -> println "params.${k.padRight(25)} = ${v}" }
+    
     /*
      * Prepare expression and covariate data
      */
-    params.each{ k, v -> println "params.${k.padRight(25)} = ${v}" }
-    
     NormalizeExpression(raw_expr_ch, filt_exp_ch, params.exp_platform, gte_ch )
     norm_exp_ch = NormalizeExpression.out.norm_expression_table
-    covariates_ch = PREPARE_COVARIATES(params.exp_platform, raw_expr_ch, norm_exp_ch, params.signature_matrix_name, params.deconvolution_method,covars_ch, gene_lengths_ch, annotation_ch, params.genotype_pcs, params.gte)
-    //norm_exp_ch = filt_exp_ch
-    //covariates_ch = Channel.fromPath("/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/test_data/output/covariates.combined.txt")
+    covariates_ch = PREPARE_COVARIATES(params.exp_platform, raw_expr_ch, norm_exp_ch, params.signature_matrix_name, params.deconvolution_method,covars_ch, gene_lengths_ch, annotation_ch, Channel.fromPath(params.genotype_pcs), Channel.fromPath(params.gte))
     
     /*
      * Prepare genotype data
@@ -142,12 +128,6 @@ workflow {
         ConvertVcfToBgen(chr_vcf_pairs)
         chr_bgen_pairs = ConvertVcfToBgen.out.bgen_ch.view()
       }
-
-      // ieQTL mapping
-      chunk_geno_ch = chunk_ch.join(chr_bgen_pairs).view()
-      eqtl_ch = norm_exp_ch.combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test)).combine(chunk_geno_ch)
-      results_ch = IeQTLmappingPerGeneBgen(eqtl_ch)
-
     } else { // Plink genotypes
       */
 
@@ -157,8 +137,6 @@ workflow {
       if (params.bfile == '') {
         ConvertVcfToPlink(chr_vcf_pairs)
         MergePlinkPerChr(ConvertVcfToPlink.out.bfile_per_chr_ch.collect()).set {bfile_ch}
-
-        //interaction_ch = norm_exp_ch.combine(MergePlinkPerChr.out.bfile_ch).combine(covariates_ch).combine(annotation_ch).combine(gte_ch).combine(Channel.fromPath(params.genes_to_test)).combine(Channel.of(params.covariate_to_test)).combine(chunk_ch.map { it[1] })
       } else {
         Channel
           .from(params.bfile)
@@ -167,17 +145,17 @@ workflow {
           .set { bfile_ch }
       }
 
-      //bfile_ch.view()
       /*
        * Run interaction analysis
-       */      
-      
-      RUN_INTERACTION_QTL_MAPPING(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, Channel.of(params.covariate_to_test), chunk_ch.map { it[1] })
-      if (params.lab_cell_perc != ''){
-        covariates_ch = PREPARE_COVARIATES(params.exp_platform, raw_expr_ch, norm_exp_ch, params.signature_matrix_name, "lab", covars_ch, gene_lengths_ch, annotation_ch, params.genotype_pcs, params.gte)
-
+       */
+      if (params.qtls_to_test == ''){
+        features_to_test_ch = Channel.fromPath(params.genes_to_test)
+      } else {
+        features_to_test_ch = Channel.fromPath(params.qtls_to_test)
       }
       
+      RUN_INTERACTION_QTL_MAPPING(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, Channel.of(params.covariate_to_test), chunk_ch.map { it[1] }, features_to_test_ch)
+            
       
       /*
        * Stratified analysis 
