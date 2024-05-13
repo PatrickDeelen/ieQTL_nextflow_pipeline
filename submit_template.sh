@@ -18,31 +18,37 @@ export NXF_HOME=../nextflowcache
 set -f
 
 # Define paths
-c=NTR_GoNL
 # Genotype data
 #[full path to the folder with imputed filtered vcf files produced by eQTLGen pipeline 2_Imputation step (postimpute folder)]
 vcf_dir_path=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/2_Imputation/out/${c}/postimpute/
-#bfile=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/data/${c}/chr2.flt
-bfile=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/tmp1/chr2.flt
-raw_exp_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/data/${c}/${c}_raw_expression.txt.gz
-gte_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/data/${c}/${c}.gte
-norm_exp_path=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/1_DataQC/out/${c}/outputfolder_exp/exp_data_QCd/exp_data_preprocessed.txt
-covariate_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/BIOS_covariates.txt
 
+# raw expression data (same as input to DataQC step)
+raw_exp_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/data/${c}/${c}_raw_expression.txt.gz
+# normalized expression data (output of the DataQC step)
+norm_exp_path=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/1_DataQC/out/${c}/outputfolder_exp/exp_data_QCd/exp_data_preprocessed.txt
+# File that contains cohort covariates: E.g. sex and age. Sample ids should be the same as in the genotype data
+covariate_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/BIOS_covariates.txt
+# genotype to expression coupling file
+gte_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/data/${c}/${c}.gte
+
+# covariate to test (name of the sex column in the covariate file)
+covariate_to_test=gender_F1M2
+
+# Path to genotype PCs (output of dataQC step)
 genotype_pcs_path=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/1_DataQC/out/${c}/outputfolder_gen/gen_PCs/GenotypePCs.txt
+# Path to expression PCs (output of dataQC step)
 expression_pcs_path=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/1_DataQC/out/${c}/outputfolder_exp/exp_PCs/exp_PCs.txt
 
-exp_platform=RNAseq
-cohort_name=$c
-genome_build="GRCh38"
-covariate_to_test=gender_F1M2
-#genes_to_test=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run1/bios_sign_genes.txt
-qtls_to_test=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow//sign_qtls.txt.gz
-output_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/tmp1/results/
+# output folder (needs to exist)
+output_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run2/results/${c}_interactions/
 
-# Additional settings and optional arguments for the command
-#chunk_file=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/ieQTL_nextflow_pipeline/data/test_chunks.txt
-chunk_file=test_chunks.txt
+
+# Path to the nextflow interaction analysis folder
+script_folder=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/ieQTL_nextflow_pipeline/
+
+qtls_to_test=${script_folder}/data/sign_qtls.txt.gz
+chunk_file=${script_folder}/data/ChunkingFile.GRCh38.110.txt
+exp_platform=RNAseq
 
 # Command:
 NXF_VER=21.10.6 nextflow run /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/ieQTL_nextflow_pipeline/InteractionAnalysis.nf \
@@ -56,11 +62,10 @@ NXF_VER=21.10.6 nextflow run /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/outpu
 --covariate_to_test $covariate_to_test \
 --qtls_to_test $qtls_to_test \
 --genotype_pcs $genotype_pcs_path \
---expr_pcs $expression_pcs_path \
 --chunk_file $chunk_file \
 --outdir ${output_path}  \
 --run_stratified false \
 --preadjust false \
 --cell_perc_interactions false \
 -resume \
--profile singularity,slurm \
+-profile singularity,slurm
