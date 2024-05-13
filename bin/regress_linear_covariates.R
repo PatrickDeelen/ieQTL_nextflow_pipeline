@@ -25,7 +25,10 @@ if (! is.null(pc_path) ){
   covars <- inner_join(covars, pcs, by = c("id"))
   row.names(covars) <- covars[,1]
   covars[,1] <- NULL
-} 
+} else {
+  row.names(covars) <- covars$id
+  covars[,"id"] <- NULL
+}
 
 covars <- na.omit(covars)
 
@@ -40,6 +43,7 @@ row.names(new_expr) <- row.names(expr)
 for (col in 1:ncol(expr)){
   tmp_data <- cbind(expr[,col], covars)
   colnames(tmp_data)[1] <- "gene"
+  print(str(tmp_data))
   lm_fit <- lm(gene ~ . ,data = tmp_data)
   new_expr[,col] <- lm_fit$residuals
 }

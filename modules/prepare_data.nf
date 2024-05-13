@@ -1,10 +1,6 @@
 #! /usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
-
-//gene_lengths = "$projectDir/data/Homo_sapiens.GRCh37.75.gene_lengths.txt.gz" 
-//limix_annotation = "$projectDir/data/limix_gene_annotation_Ensembl71.txt.gz"
-
 /*
  * run TPM normalization on the raw expression file and rename gene ids to gene names
  */
@@ -61,24 +57,6 @@ process Deconvolution {
     """
 }
 
-
-process CombineCovariatesTest {
-    echo true
-    label "medium1"
-
-    publishDir params.outdir, mode: 'copy'
-
-    input:
-    path "separate_covariates*txt"
-
-    output:
-    path "covariates.combined.txt" , emit: covariates_ch
-
-    script:
-    """
-    Rscript $projectDir/bin/combine_tables.R covariates.combined.txt separate_covariates*txt
-    """
-}
 
 process TransformCovariates {
     echo true
@@ -166,26 +144,6 @@ process CombineCovariates {
     """
 }
 
-/*
- * Creates a limix annotation file and a file with gene lengths from a GTF file
- */
-process PrepareAnnotation {
-    publishDir params.outdir, mode: 'copy'
-    input:
-    path gtf_annotation
-
-    output:
-    path ("LimixAnnotationFile.txt"), emit: annotation_ch 
-	path ("GeneLengths.txt"), emit: gene_lengths_ch
-	path ("ChunkingFile.txt"), emit: chunks_ch
-
-    script:
-    """
-	Rscript $projectDir/bin/createFeatureAnnotation.R --in_gtf ${gtf_annotation} --n_genes 500 --feature_name ENSG --out_dir ./
-    """
-}
-
-
 process CalculateRNAQualityScore {
     label "short"
     
@@ -269,8 +227,6 @@ process SplitCovariates {
 process ConvertVcfToBgen {
     label "medium2"
 
-    //echo true
-    //publishDir params.outdir, mode: 'copy'
     input:
         tuple val(chr), path(vcf_file)
 
@@ -286,8 +242,6 @@ process ConvertVcfToBgen {
 process ConvertVcfToPlink {
     label "medium1"
 
-    //echo true
-    //publishDir params.outdir, mode: 'copy'
     input:
         tuple val(chr), path(vcf_file)
 
@@ -296,7 +250,7 @@ process ConvertVcfToPlink {
     
     script:
     """    
-        ${projectDir}/tools/plink  --vcf $vcf_file --make-bed --out chr${chr} --chr $chr  --const-fid
+        ${projectDir}/tools/plink  --vcf $vcf_file --make-bed --out chr${chr} --chr $chr  --const-fid --keep-allele-order
     """
 }
 
@@ -344,10 +298,15 @@ workflow PREPARE_COVARIATES {
         CombineCovariatesRNAqual(covariates,Channel.fromPath("NA"), genotype_pcs, gte, rnaquality_ch)
         covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
     } else if (deconvolution_method == "lab"){
-        cell_counts_ch = Channel.fromPath(params.lab_cell_perc)
-        rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
-        CombineCovariatesRNAqual(covariates, cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
-        covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
+        if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") {
+            cell_counts_ch = Channel.fromPath(params.lab_cell_perc)
+            rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
+            CombineCovariatesRNAqual(covariates, cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
+            covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
+        } else {
+            cell_counts_ch = Channel.fromPath(params.lab_cell_perc)
+            covariates_ch = CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
+        }
     } else {
         if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") {
             cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths), signature_matrix, deconvolution_method, exp_type)

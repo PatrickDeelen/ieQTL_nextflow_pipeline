@@ -53,6 +53,7 @@ params.num_perm = 0
 params.run_stratified = false
 params.preadjust = false
 params.cell_perc_interactions = false
+params.expr_pcs = ''
 params.num_expr_PCs = 25
 
 /*
@@ -98,7 +99,7 @@ if (params.bgen_dir != '') {
 } 
 
 
-include { PREPARE_COVARIATES; PrepareAnnotation; NormalizeExpression; ConvertVcfToBgen; ConvertVcfToPlink; MergePlinkPerChr } from './modules/prepare_data.nf'
+include { PREPARE_COVARIATES; NormalizeExpression; ConvertVcfToBgen; ConvertVcfToPlink; MergePlinkPerChr } from './modules/prepare_data.nf'
 //include { IeQTLmappingPerGeneTMP; IeQTLmappingPerSNPGene; IeQTLmappingPerGene; IeQTLmappingPerGeneNoChunks; IeQTLmappingPerGeneBgen; FilterGenesToTest } from './modules/interaction_analysis.nf'
 include { RUN_INTERACTION_QTL_MAPPING; IeQTLmapping; IeQTLmapping_InteractionCovariates; SplitCovariates; PreadjustExpression } from './modules/interaction_analysis2.nf'
 include { RUN_STRATIFIED_ANALYSIS; RunEqtlMappingPerGenePlink } from './modules/stratified_analysis.nf'

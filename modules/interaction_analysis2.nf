@@ -13,7 +13,7 @@ process IeQTLmapping {
     
 
     output:
-    path "limix_out/*"
+    path "limix_out/*", optional: true
 
     shell:
     '''
@@ -33,11 +33,6 @@ process IeQTLmapping {
         arg_line="-ff !{qtl_ch}"
     fi
 
-    #python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
-
-    #eval "$(conda shell.bash hook)"
-    #conda activate py39
-    #python /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_limix/limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
     
     python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
      --plink ${plink_base} \
@@ -79,11 +74,11 @@ process IeQTLmapping_InteractionCovariates {
     tag "Chunk: $chunk"
 
     input:
-    tuple path(preadjusted_expression), path(bed), path(bim), path(fam), path(interaction_covariates), path(limix_annotation), val(covariate_to_test), val(chunk)
+    tuple path(preadjusted_expression), path(bed), path(bim), path(fam), path(interaction_covariates), path(limix_annotation), val(covariate_to_test), val(chunk), path(qtl_ch)
     
 
     output:
-    //path "limix_out/*"
+    path "limix_out/*", optional: true
 
     shell:
     '''
@@ -98,16 +93,11 @@ process IeQTLmapping_InteractionCovariates {
     genes=!{params.genes_to_test}
     if [ "${#qtls}" -gt 1 ]
     then 
-        arg_line="-fvf $qtls_ch"
+        arg_line="-fvf !{qtl_ch}"
     else
-        arg_line="-ff $qtls_ch"
+        arg_line="-ff !{qtl_ch}"
     fi
 
-    #python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
-
-    #eval "$(conda shell.bash hook)"
-    #conda activate py39
-    #python /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_limix/limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
     python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
      --plink ${plink_base} \
       -af !{limix_annotation} \
@@ -137,7 +127,6 @@ process IeQTLmapping_InteractionCovariates {
       else
 	    echo "No limix output to copy"      
       fi
-      ls -la ${outdir}/  
       
     '''
 }
@@ -149,7 +138,7 @@ process IeQTLmapping_InteractionCovariates {
 process SplitCovariates {
     tag "Split covariates"
     label "short"
-    //publishDir params.outdir, mode: 'copy'
+    publishDir params.outdir, mode: 'copy'
 
     input:
     path covariates_path
@@ -169,7 +158,7 @@ process SplitCovariates {
         python !{projectDir}/bin/extract_columns_from_file.py !{covariates_path} ${interaction_covariates} covariates_interaction.txt
         python !{projectDir}/bin/extract_columns_from_file.py !{covariates_path} ${interaction_covariates} covariates_preadjust.txt -v
     else 
-        cell_types=`head -1  ../../run1/results/RS/cell_counts.txt | cut -f2- | sed "s:\t:,:g"`
+        cell_types=`cut -f2- !{params.outdir}/cell_counts.txt | awk 'BEGIN {FS="\t"; OFS=","}; {if (NR == 1) {$1=$1; print}}'`
         interaction_covariates2=`echo "$interaction_covariates,$cell_types"`
 
         python !{projectDir}/bin/extract_columns_from_file.py !{covariates_path} ${interaction_covariates2} covariates_interaction.txt
@@ -185,7 +174,7 @@ process SplitCovariates {
 process PreadjustExpression {
     tag "Preadjust expression"
     label "short"
-    //publishDir params.outdir, mode: 'copy'
+    publishDir params.outdir, mode: 'copy'
 
     input:
     path expression_path
@@ -196,12 +185,20 @@ process PreadjustExpression {
     path ("expression_corrected.noINT.txt")
 
     shell:
+    if (params.expr_pcs == ''){
+        '''
+        Rscript !{projectDir}/bin/regress_linear_covariates.R !{expression_path} !{covariates_path} ./
+        '''
+    } else {
     '''
-    n=!{params.num_expr_PCs}
-    n2=$((n + 1))
-    cut -f1-$n2 !{pcs_path} > pcs.txt
-    Rscript !{x}/bin/regress_linear_covariates.R !{expression_path} !{covariates_path} ./ pcs.txt
+    
+      n=!{params.num_expr_PCs}
+      n2=$((n + 1))
+      cut -f1-$n2 !{pcs_path} > pcs.txt
+      Rscript !{projectDir}/bin/regress_linear_covariates.R !{expression_path} !{covariates_path} ./ pcs.txt
+    
     '''
+    }
 }
 
 process ConvertIeQTLsToText {
@@ -212,7 +209,6 @@ process ConvertIeQTLsToText {
     
     output:
     
-
     script:
     """
     mkdir limix_out_text/
@@ -254,19 +250,25 @@ workflow RUN_INTERACTION_QTL_MAPPING {
     main:
 
     
-    if (params.preadjust){            
-        SplitCovariates(covariates_ch)
-        PreadjustExpression(tmm_expression, SplitCovariates.out.linear_covariates_ch, params.expr_pcs)
+    if (params.preadjust){   
 
-        interaction_ch = PreadjustExpression.out.combine(plink_geno).combine(SplitCovariates.out.interaction_covariates_ch).combine(limix_annotation).combine(covariate_to_test).combine(chunk)
+        expr_pcs_ch = params.expr_pcs
+            ? Channel.fromPath(params.expr_pcs, checkIfExists:true)
+            : Channel.fromPath('EMPTY')
+
+        
+        expr_pcs_ch.view()
+        //expr_pcs_ch = expr_pcs_ch.ifEmpty { 'EMPTY' }
+        expr_pcs_ch.view()
+        SplitCovariates(covariates_ch)
+        PreadjustExpression(tmm_expression, SplitCovariates.out.linear_covariates_ch, expr_pcs_ch)
+
+        interaction_ch = PreadjustExpression.out.combine(plink_geno).combine(SplitCovariates.out.interaction_covariates_ch).combine(limix_annotation).combine(covariate_to_test).combine(chunk).combine(qtl_ch)
         ConvertIeQTLsToText(IeQTLmapping_InteractionCovariates(interaction_ch).collect())
     } else {
         interaction_ch = tmm_expression.combine(plink_geno).combine(covariates_ch).combine(limix_annotation).combine(covariate_to_test).combine(chunk).combine(qtl_ch)
         ConvertIeQTLsToText(IeQTLmapping(interaction_ch).collect())
     
     }   
-    
-    //emit:
-    //    results_ch
 
 }
