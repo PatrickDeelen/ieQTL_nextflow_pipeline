@@ -86,6 +86,7 @@ cat("Number of samples with covariate data available:", nrow(covar), "\n")
 
 # add genotype PCs
 geno_pcs <- read.delim(args$genotype_pcs, check.names = F, header = T, row.names = 1, as.is = T)
+geno_pcs <- geno_pcs[,1:4]
 #geno_pcs <- rename_samples(geno_pcs[,1:4], gte)
 
 covar_merged <- merge(covar, geno_pcs, by = 0)

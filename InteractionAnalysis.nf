@@ -7,25 +7,6 @@ def helpMessage() {
   =======================================================
     Interaction analysis v${workflow.manifest.version}
   =======================================================
-  Usage:
-  The typical command for running the pipeline is as follows:
-  
-
-  Mandatory arguments:
-    --cohort_name                 Name of the cohort.
-    --bfile                       Path to imputed genotype files as used in eQTLGen main analysis in plink bed/bim/fam format (without extensions bed/bim/fam).
-    --raw_expfile                 Path to the un-preprocessed gene expression matrix (genes/probes in the rows, samples in the columns). Can be from RNA-seq experiment or from array. NB! For Affymetrix arrays (AffyU219, AffyExon) we assume that standard preprocessing and normalisation is already done.
-    --norm_expfile                Path to the normalized gene expression matrix produced by DataQC step in the primary eQTLGen pipeline.
-    --gte                         Genotype-to-expression linking file. Tab-delimited, no header. First column: sample ID for genotype data. Second column: corresponding sample ID for gene expression data. Can be used to filter samples from the analysis.
-    --exp_platform                Expression platform. Should be one of HT12v3, HT12v4, HuRef8, RNAseq, AffyU219, AffyHumanExon, RNAseq_HGNC. 
-    --covariates                  Path to the covariate file containing the covariate to test for interaction, sex, age and cohort-specific covariates. Tab-delimited, with header (Samples in rows, covariates in columns). NB! Covariate ids should be the same as used in the genotype data.
-    --covariate_to_test           Name of covariate to test for interaction. Should be one of the column names of the covariate file.
-    --outdir                      Path to the output directory.
-
-  Optional arguments
-    --signature_matrix_name       Name of the signature matrix using in cell type deconvolution. Either LM22 or ABIS
-    --deconvolution_method        Name of the cell type deconvolution method. Either nnls or dtangle
-    --plink                      Plink executable
     
   """.stripIndent()
 }

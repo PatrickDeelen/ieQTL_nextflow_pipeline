@@ -4,7 +4,7 @@
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=10G
-#SBATCH --job-name="DataQc"
+#SBATCH --job-name="InteractionAnalysis"
 
 # These are needed modules in UT HPC to get singularity and Nextflow running. Replace with appropriate ones for your HPC.
 ml nextflow

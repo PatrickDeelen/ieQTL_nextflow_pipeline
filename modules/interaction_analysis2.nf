@@ -138,7 +138,7 @@ process IeQTLmapping_InteractionCovariates {
 process SplitCovariates {
     tag "Split covariates"
     label "short"
-    publishDir params.outdir, mode: 'copy'
+    //publishDir params.outdir, mode: 'copy'
 
     input:
     path covariates_path
@@ -174,7 +174,7 @@ process SplitCovariates {
 process PreadjustExpression {
     tag "Preadjust expression"
     label "short"
-    publishDir params.outdir, mode: 'copy'
+    //publishDir params.outdir, mode: 'copy'
 
     input:
     path expression_path
@@ -201,6 +201,34 @@ process PreadjustExpression {
     }
 }
 
+process PlotSTX3NOD2 {
+    label "short"
+    publishDir params.outdir, mode: 'copy'
+
+    input:
+    tuple path (expression_path), path (covariate_path), path (bed), path (bim), path (fam), path (exp_PCs)
+
+    output:
+    path ("*.pdf")
+
+    shell:
+    if (params.expr_pcs == ''){   
+        '''
+        geno=!{bed}
+        plink_base=${geno%.bed}
+        !{projectDir}/tools/plink --bfile $plink_base --snp rs1981760 --recode 12 --out snp_geno
+        Rscript !{projectDir}/bin/plot_STX3_NOD2.R -e !{expression_path} -c !{covariate_path} -b snp_geno.ped
+        '''
+    } else {
+        '''
+        geno=!{bed}
+        plink_base=${geno%.bed}
+        !{projectDir}/tools/plink --bfile $plink_base --snp rs1981760 --recode 12 --out snp_geno
+        Rscript !{projectDir}/bin/plot_STX3_NOD2.R -e !{expression_path} -c !{covariate_path} -b snp_geno.ped -p !{exp_PCs}
+        '''
+    }
+}
+
 process ConvertIeQTLsToText {
     echo true
 
@@ -224,19 +252,8 @@ process ConvertIeQTLsToText {
     """
 }
 
-process GetTopIeQTLs {
-    echo true
 
-    input:
-    path limix_folder
-    
-    output:
-    
 
-    script:
-    """
-    """
-}
 workflow RUN_INTERACTION_QTL_MAPPING {   
     take:
         tmm_expression
@@ -256,10 +273,6 @@ workflow RUN_INTERACTION_QTL_MAPPING {
             ? Channel.fromPath(params.expr_pcs, checkIfExists:true)
             : Channel.fromPath('EMPTY')
 
-        
-        expr_pcs_ch.view()
-        //expr_pcs_ch = expr_pcs_ch.ifEmpty { 'EMPTY' }
-        expr_pcs_ch.view()
         SplitCovariates(covariates_ch)
         PreadjustExpression(tmm_expression, SplitCovariates.out.linear_covariates_ch, expr_pcs_ch)
 
@@ -269,6 +282,8 @@ workflow RUN_INTERACTION_QTL_MAPPING {
         interaction_ch = tmm_expression.combine(plink_geno).combine(covariates_ch).combine(limix_annotation).combine(covariate_to_test).combine(chunk).combine(qtl_ch)
         ConvertIeQTLsToText(IeQTLmapping(interaction_ch).collect())
     
-    }   
+    }
+
+    PlotSTX3NOD2(tmm_expression.combine(covariates_ch).combine(plink_geno).combine(expr_pcs_ch))
 
 }

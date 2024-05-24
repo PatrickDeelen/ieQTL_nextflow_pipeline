@@ -250,7 +250,14 @@ process ConvertVcfToPlink {
     
     script:
     """    
-        ${projectDir}/tools/plink  --vcf $vcf_file --make-bed --out chr${chr} --chr $chr  --const-fid --keep-allele-order
+        ${projectDir}/tools/plink2  \
+        --vcf $vcf_file \
+        --make-bed --out chr${chr} \
+        --chr $chr  \
+        --const-fid \
+        --maf 0.05 --hwe 1e-06 --geno 0.05 --mac 10 \
+        --extract-if-info "R2 > 0.4"
+
     """
 }
 
