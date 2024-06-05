@@ -1,6 +1,11 @@
 #! /usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
+/*
+ * Split the combined covariate table into 2 according to the covariate of interest (E.g. sex or age). 
+ * In case of a binary covariate the 2 values will be used for the split (E.g. males and females separately), 
+ * in case of a quantitative covariate, samples falling in the first and last quartile will be written to the output files.
+ */
 process StratifyData {
     label "medium2"
     publishDir params.outdir, mode: 'copy'
@@ -17,6 +22,9 @@ process StratifyData {
     """
 }
 
+/*
+ * Run the eQTL mapping for the selected covariate level, testing all SNPs within a window from the genes to test
+ */
 process RunEqtlMappingPerGenePlink{
     label "long"
     tag "Chunk: $chunk"
@@ -90,8 +98,5 @@ workflow RUN_STRATIFIED_ANALYSIS {
         covar_to_test_ch = Channel.of(params.covariate_to_test)
         StratifyData(covariates, covar_to_test_ch, norm_expression)
         RunEqtlMappingPerGenePlink(norm_expression.combine(plink_geno).combine(StratifyData.out.strat_covariates_ch.flatten()).combine(limix_annotation).combine(gte).combine(covar_to_test_ch).combine(chunk.map { it[1] }))
-        
-    //emit:
-    //    RunEqtlMappingPerGenePlink.out
 }
 

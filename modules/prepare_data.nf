@@ -2,19 +2,20 @@
 nextflow.enable.dsl = 2
 
 /*
- * run TPM normalization on the raw expression file and rename gene ids to gene names
+ * run TPM normalization on the raw expression file and rename gene ids to gene names.
+ * This expression table will be used in cell type deconvolution
  */
 process TPM {
     tag "TPM normalization"
     label "short"
 
     input:
-    path raw_expression
-    path gene_lengths
+      path raw_expression
+      path gene_lengths
 
 
     output:
-    path "*.TPM.txt.gz"
+      path "*.TPM.txt.gz"
 
     script:
     """
@@ -28,7 +29,7 @@ process TPM {
 }
 
 /*
- * run deconvolution using nnls method with lm22 signature matrix
+ * run deconvolution using $deconvolution_method method with $signature_matrix signature matrix
  */
 process Deconvolution {
     tag "deconvolution"
@@ -37,13 +38,13 @@ process Deconvolution {
     publishDir params.outdir, mode: 'copy'
     
     input:
-    path tpm_expression
-    path signature_matrix
-    val deconvolution_method
-    val exptype
+      path tpm_expression
+      path signature_matrix
+      val deconvolution_method
+      val exptype
 
     output:
-    path "cell_counts.txt"
+      path "cell_counts.txt"
 
     script:
     """
@@ -53,46 +54,11 @@ process Deconvolution {
 	    ${deconvolution_method} \
         cell_counts.txt \
         ${exptype}
-
     """
 }
-
-
-process TransformCovariates {
-    echo true
-    label "medium1"
-
-    publishDir params.outdir, mode: 'copy'
-
-    input:
-    val cov_type
-    path covariate_file
-    path gte
-    val rename
-    val INT
-    val cut
-
-    output:
-    path "*.transformed.txt"
-    
-
-    script:
-    """
-        Rscript $projectDir/bin/transform_covariates.R \
-        -i ${covariate_file} \
-        -g ${gte} \
-        --rename ${rename} \
-        --int ${INT} \
-        -o ${cov_type}.transformed.txt \
-        --cut ${cut}
-
-        cp *pdf ${params.outdir}/
-    """
-}
-
 
 /*
- * Combine major covariates with cell counts, genotype PCs and RNA-quality
+ * Combine major covariates with cell counts, genotype PCs and RNA-quality. Plot covariate distributions.
  */
 process CombineCovariatesRNAqual {
     label "medium1"
@@ -100,15 +66,15 @@ process CombineCovariatesRNAqual {
     publishDir params.outdir, mode: 'copy'
 
     input:
-    path general_covariates
-    path cell_counts
-    path genotype_PCs
-    path gte
-    path rna_qual
+        path general_covariates
+        path cell_counts
+        path genotype_PCs
+        path gte
+        path rna_qual
 
     output:
-    path ("covariates.combined.txt"), emit: covariates_ch
-    path ("*.distributions.pdf")
+        path ("covariates.combined.txt"), emit: covariates_ch
+        path ("*.distributions.pdf")
 
     script:
     if (cell_counts != "NA")
@@ -122,7 +88,7 @@ process CombineCovariatesRNAqual {
 }
 
 /*
- * Combine major covariates with cell counts, genotype PCs
+ * Combine major covariates with cell counts and genotype PCs. Plot covariate distributions.
  */
 process CombineCovariates {
     label "medium1"
@@ -130,13 +96,14 @@ process CombineCovariates {
     publishDir params.outdir, mode: 'copy'
 
     input:
-    path general_covariates
-    path cell_counts
-    path genotype_PCs
-    path gte
+        path general_covariates
+        path cell_counts
+        path genotype_PCs
+        path gte
 
     output:
-    path "covariates.combined.txt"
+        path ("covariates.combined.txt"), emit: covariates_ch
+        path ("*.distributions.pdf")
 
     script:
     """
@@ -144,6 +111,9 @@ process CombineCovariates {
     """
 }
 
+/*
+ * Calculate RNA quality score for RNA-seq datasets as the Pearson correlation between each sample and the average expression over all samples
+ */
 process CalculateRNAQualityScore {
     label "short"
     
@@ -160,19 +130,25 @@ process CalculateRNAQualityScore {
 
 }
 
+/*
+ * Normalize raw expression: use TMM for RNA-seq data and quantile normalization for array data. 
+ * Do not apply sample and gene filtering again, instead use the normalized output from eQTLGen DataQC pipeline, where these filters have been applied. 
+ * We can't use that DataQC output directly because we don't need log2 and INT that was applied there.
+ */
 process NormalizeExpression {
     label "medium2"
     echo true
     publishDir params.outdir, mode: 'copy'
+    
     input:
-      path(raw_expr)
-      path(norm_expr)
-      val(exp_platform)
-      path(gte)
+        path(raw_expr)
+        path(norm_expr)
+        val(exp_platform)
+        path(gte)
 
     output:
-	path ('outputfolder_exp'), emit: expression_folder 
-	path ('outputfolder_exp/exp_data_preprocessed.txt'), emit: norm_expression_table
+	    path ('outputfolder_exp'), emit: expression_folder 
+	    path ('outputfolder_exp/exp_data_preprocessed.txt'), emit: norm_expression_table
     
     shell:
     '''
@@ -203,14 +179,20 @@ process NormalizeExpression {
            -o ${outdir}    
     '''
 }
+
+/*
+ * Split the combined covariate table into 2 according to the covariate of interest (E.g. sex or age). 
+ * In case of a binary covariate the 2 values will be used for the split (E.g. males and females separately), 
+ * in case of a quantitative covariate, samples falling in the first and last quartile will be written to the output files.
+ */
 process SplitCovariates {
     label "medium1"
-
     publishDir params.outdir, mode: 'copy'
+    
     input:
-    path normalized_expression_data
-    path combined_covariates
-    val covariate_name
+        path normalized_expression_data
+        path combined_covariates
+        val covariate_name
     
 
     output:
@@ -223,7 +205,9 @@ process SplitCovariates {
 
 }
 
-
+/*
+ * Convert VCF files to bgen (not currently used)
+ */
 process ConvertVcfToBgen {
     label "medium2"
 
@@ -239,6 +223,9 @@ process ConvertVcfToBgen {
     """
 }
 
+/*
+ * Convert VCF files to plink and apply variant filtering (per chromosome)
+ */
 process ConvertVcfToPlink {
     label "medium1"
 
@@ -251,16 +238,19 @@ process ConvertVcfToPlink {
     script:
     """    
         ${projectDir}/tools/plink2  \
-        --vcf $vcf_file \
-        --make-bed --out chr${chr} \
-        --chr $chr  \
-        --const-fid \
-        --maf 0.05 --hwe 1e-06 --geno 0.05 --mac 10 \
-        --extract-if-info "R2 > 0.4"
+            --vcf $vcf_file \
+            --make-bed --out chr${chr} \
+            --chr $chr  \
+            --const-fid \
+            --maf 0.05 --hwe 1e-06 --geno 0.05 --mac 10 \
+            --extract-if-info "R2 > 0.4"
 
     """
 }
 
+/*
+ * Combine per chromosome plink genotype files into one
+ */
 process MergePlinkPerChr {
     label "medium2"
 
@@ -277,12 +267,13 @@ process MergePlinkPerChr {
         echo ${f%.bed} >> filelist.txt
     done
 
-    #cat filelist.txt
-
     ${plink_exe} --merge-list filelist.txt --make-bed --out merged
     '''
 }
 
+/*
+ * Prepare covariate table: run deconvolution, estimate RNA quality, combine all covariates together
+ */
 workflow PREPARE_COVARIATES {
     take:
         exp_type
@@ -297,23 +288,28 @@ workflow PREPARE_COVARIATES {
 	    gte
 
     main:
+    //signature matrix path
 	signature_matrix = "$projectDir/data/signature_matrices/" + signature_matrix_name  + "_ensg.txt.gz"
     
+    // if no deconvolution is required
     if (deconvolution_method == "NA") {
         rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data).view()
-
-        CombineCovariatesRNAqual(covariates,Channel.fromPath("NA"), genotype_pcs, gte, rnaquality_ch)
+        CombineCovariatesRNAqual(covariates, Channel.fromPath("NA"), genotype_pcs, gte, rnaquality_ch)
         covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
+    
+    // if lab-based cell proportions are provided: don't run deconvolution
     } else if (deconvolution_method == "lab"){
-        if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") {
+        if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") { // if RNA-seq data
             cell_counts_ch = Channel.fromPath(params.lab_cell_perc)
             rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
             CombineCovariatesRNAqual(covariates, cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
             covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
         } else {
             cell_counts_ch = Channel.fromPath(params.lab_cell_perc)
-            covariates_ch = CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
+            CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
+            covariates_ch = CombineCovariates.out.covariates_ch
         }
+    // the most common case: run deconvolution on TPM-normalized expression, estimate RNA quality in case of RNA-seq data and combine all covariates
     } else {
         if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") {
             cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths), signature_matrix, deconvolution_method, exp_type)
@@ -322,7 +318,8 @@ workflow PREPARE_COVARIATES {
             covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
         } else {
             cell_counts_ch = Deconvolution(normalized_expression_data, signature_matrix, deconvolution_method, exp_type)
-            covariates_ch = CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
+            CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
+            covariates_ch = CombineCovariates.out.covariates_ch
         }
     }   
     

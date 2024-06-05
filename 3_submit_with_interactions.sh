@@ -47,7 +47,7 @@ output_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-
 # Path to the nextflow interaction analysis folder
 script_folder=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/ieQTL_nextflow_pipeline/
 
-qtls_to_test=${script_folder}/data/sign_qtls.txt.gz
+qtls_to_test=${script_folder}/data/sign_qtls_cistrans.txt.gz
 chunk_file=${script_folder}/data/ChunkingFile.GRCh38.110.txt
 exp_platform=RNAseq
 
