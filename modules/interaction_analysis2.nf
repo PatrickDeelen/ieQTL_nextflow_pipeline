@@ -226,6 +226,7 @@ process PlotSTX3NOD2 {
         '''
         geno=!{bed}
         plink_base=${geno%.bed}
+        echo !{bed}
         !{projectDir}/tools/plink --bfile $plink_base --snp rs1981760 --recode 12 --out snp_geno
         Rscript !{projectDir}/bin/plot_STX3_NOD2.R -e !{expression_path} -c !{covariate_path} -b snp_geno.ped
         '''
@@ -279,12 +280,12 @@ workflow RUN_INTERACTION_QTL_MAPPING {
 
     main:
 
+    expr_pcs_ch = params.expr_pcs
+            ? Channel.fromPath(params.expr_pcs, checkIfExists:true)
+            : Channel.fromPath('EMPTY')
     // if run interaction analysis with covariate * genotype interaction terms, preadjust gene expression for other, linear covariates
     if (params.preadjust){   
 
-        expr_pcs_ch = params.expr_pcs
-            ? Channel.fromPath(params.expr_pcs, checkIfExists:true)
-            : Channel.fromPath('EMPTY')
 
         SplitCovariates(covariates_ch)
         PreadjustExpression(tmm_expression, SplitCovariates.out.linear_covariates_ch, expr_pcs_ch)

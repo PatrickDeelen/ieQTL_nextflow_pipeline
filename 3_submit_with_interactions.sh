@@ -54,7 +54,7 @@ exp_platform=RNAseq
 
 # Command:
 NXF_VER=21.10.6 nextflow run ${script_folder}/InteractionAnalysis.nf \
---bfile $bfile \
+--vcf_dir $vcf_dir_path \
 --raw_expfile ${raw_exp_path} \
 --norm_expfile ${norm_exp_path} \
 --gte ${gte_path} \

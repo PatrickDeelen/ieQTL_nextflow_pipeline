@@ -52,7 +52,7 @@ exp_platform=RNAseq
 
 # Command:
 NXF_VER=21.10.6 nextflow run /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/ieQTL_nextflow_pipeline/InteractionAnalysis.nf \
---bfile $bfile \
+--vcf_dir $vcf_dir_path \
 --raw_expfile ${raw_exp_path} \
 --norm_expfile ${norm_exp_path} \
 --gte ${gte_path} \
