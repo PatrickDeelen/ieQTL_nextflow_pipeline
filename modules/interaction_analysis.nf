@@ -41,6 +41,8 @@ process IeQTLmappingPerSNPGene {
       echo !{params.outdir}
       if [ ! -d !{params.outdir}/limix_output/ ]
       then
+        echo "test folder create"
+
       	mkdir !{params.outdir}/limix_output/
       fi
       if [ ! -z "$(ls -A ${outdir}/)" ]
@@ -122,6 +124,7 @@ process IeQTLmappingPerGene {
     
     if [ ! -d !{params.outdir}/limix_output/ ]
     then
+            echo "test folder create2"
       mkdir !{params.outdir}/limix_output/
     fi
     if [ ! -z "$(ls -A ${outdir}/)" ]
@@ -174,6 +177,7 @@ process IeQTLmappingPerGeneNoChunks {
       fi
       if [ ! -z "$(ls -A ${outdir}/)" ]
       then
+              echo "test folder create3"
         cp ${outdir}/* !{params.outdir}/limix_output/
       else
         echo "No limix output to copy"
@@ -225,6 +229,7 @@ process IeQTLmappingPerGeneBgen {
       echo !{params.outdir}
       if [ ! -d !{params.outdir}/limix_output/ ]
       then
+              echo "test folder create4"
         mkdir !{params.outdir}/limix_output/
       fi
       if [ ! -z "$(ls -A ${outdir}/)" ]

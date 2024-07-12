@@ -7,7 +7,9 @@ nextflow.enable.dsl = 2
  */
 process IeQTLmapping {
     tag "Chunk: $chunk"
-    //echo true
+
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true, failOnError: true
+
 
     input:
         tuple path(tmm_expression), path(bed), path(bim), path(fam), path(covariates), path(limix_annotation), val(covariate_to_test), val(chunk), path(qtl_ch)
@@ -18,6 +20,7 @@ process IeQTLmapping {
 
     shell:
     '''
+
     geno=!{bed}
     plink_base=${geno%.bed}
     outdir=${PWD}/limix_out/
@@ -52,20 +55,8 @@ process IeQTLmapping {
       -c -gm gaussnorm \
       -hwe 0.0001 \
       --write_permutations --write_zscore
-      
-      # make the output folder in the result folder
-      if [ ! -d !{params.outdir}/limix_output/ ]
-      then
-      	mkdir !{params.outdir}/limix_output/
-      fi
-    
-      # copy the interaction results to the results folder
-      if [ ! -z "$(ls -A ${outdir}/)" ]
-      then
-      	cp ${outdir}/* !{params.outdir}/limix_output/
-      else
-	    echo "No limix output to copy"      
-      fi
+
+
       
     '''
 }
@@ -77,6 +68,8 @@ process IeQTLmapping {
  */
 process IeQTLmapping_InteractionCovariates {
     tag "Chunk: $chunk"
+
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true, failOnError: true
 
     input:
         tuple path(preadjusted_expression), path(bed), path(bim), path(fam), path(interaction_covariates), path(limix_annotation), val(covariate_to_test), val(chunk), path(qtl_ch)
@@ -121,17 +114,7 @@ process IeQTLmapping_InteractionCovariates {
       --interaction_covariates \
       --write_permutations --write_zscore
       
-      if [ ! -d !{params.outdir}/limix_output/ ]
-      then
-      	mkdir !{params.outdir}/limix_output/
-      fi
 
-      if [ ! -z "$(ls -A ${outdir}/)" ]
-      then
-      	cp ${outdir}/* !{params.outdir}/limix_output/
-      else
-	    echo "No limix output to copy"      
-      fi     
     '''
 }
 
@@ -213,7 +196,7 @@ process PreadjustExpression {
  */
 process PlotSTX3NOD2 {
     label "short"
-    publishDir params.outdir, mode: 'copy'
+    publishDir params.outdir, mode: 'copy', overwrite: true, failOnError: true
 
     input:
         tuple path (expression_path), path (covariate_path), path (bed), path (bim), path (fam), path (exp_PCs)
@@ -246,11 +229,13 @@ process PlotSTX3NOD2 {
 process ConvertIeQTLsToText {
     echo true
 
+     publishDir "${params.outdir}", mode: 'copy', overwrite: true, failOnError: true
+
     input:
     path limix_out_files
     
-    output:
-    
+    output: path "limix_out_text/*txt ", optional: true
+
     script:
     """
     mkdir limix_out_text/
@@ -260,8 +245,8 @@ process ConvertIeQTLsToText {
       -od  limix_out_text/ \
       -sfo
     
-    gzip limix_out_text/*txt 
-    mv limix_out_text/*txt.gz ${params.outdir}/limix_output/
+    gzip limix_out_text/*txt
+    md5sum -c limix_out_text/*txt > limix_out_text/*txt.md5sum
 
     """
 }
