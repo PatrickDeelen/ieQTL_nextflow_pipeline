@@ -45,6 +45,7 @@ process Deconvolution {
 
     output:
       path "cell_counts.txt"
+      //path "cell_counts.txt.md5"
 
     script:
     """
@@ -54,6 +55,9 @@ process Deconvolution {
 	    ${deconvolution_method} \
         cell_counts.txt \
         ${exptype}
+
+    md5sum cell_counts.txt > cell_counts.txt.md5
+
     """
 }
 
@@ -74,17 +78,22 @@ process CombineCovariatesRNAqual {
 
     output:
         path ("covariates.combined.txt"), emit: covariates_ch
+        path ("covariates.combined.txt.md5")
         path ("*.distributions.pdf")
 
     script:
     if (cell_counts != "NA")
       """
       Rscript $projectDir/bin/combine_all_covariates.R -s ${general_covariates} -c ${cell_counts} -g ${genotype_PCs} -i ${gte} -o covariates.combined.txt -r ${rna_qual}
+       md5sum covariates.combined.txt > covariates.combined.txt.md5
       """
     else
       """
       Rscript $projectDir/bin/combine_all_covariates.R -s ${general_covariates} -g ${genotype_PCs} -i ${gte} -o covariates.combined.txt -r ${rna_qual}
+       md5sum covariates.combined.txt > covariates.combined.txt.md5
       """
+
+
 }
 
 /*
@@ -103,12 +112,15 @@ process CombineCovariates {
 
     output:
         path ("covariates.combined.txt"), emit: covariates_ch
+        path ("covariates.combined.txt.md5")
         path ("*.distributions.pdf")
 
     script:
     """
-    Rscript $projectDir/bin/combine_all_covariates.R -s ${general_covariates} -c ${cell_counts} -g ${genotype_PCs} -i ${gte} -o covariates.combined.txt 
+    Rscript $projectDir/bin/combine_all_covariates.R -s ${general_covariates} -c ${cell_counts} -g ${genotype_PCs} -i ${gte} -o covariates.combined.txt
+    md5sum covariates.combined.txt > covariates.combined.txt.md5
     """
+
 }
 
 /*
@@ -176,7 +188,13 @@ process NormalizeExpression {
            -l !{gte} \
            -p !{exp_platform} \
            -m $probe_mapping_file \
-           -o ${outdir}    
+           -o ${outdir}
+
+
+        cd ${outdir}
+
+        md5sum * > outputfolder_exp.md5
+
     '''
 }
 

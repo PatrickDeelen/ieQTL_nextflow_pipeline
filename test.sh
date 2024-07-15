@@ -17,10 +17,12 @@ export NXF_HOME=../nextflowcache
 # Disable pathname expansion. Nextflow handles pathname expansion by itself.
 set -f
 
+c="LL"
+
 # Define paths
 base_folder=/groups/umcg-bios/tmp01/projects/BIOS_for_eQTLGenII/pipeline/20220426/
 # Genotype data
-# full path to the folder with imputed filtered vcf files produced by eQTLGen pipeline 2_Imputation step (postimpute folder)]
+# Wfull path to the folder with imputed filtered vcf files produced by eQTLGen pipeline 2_Imputation step (postimpute folder)]
 vcf_dir_path=${base_folder}/2_Imputation/out/${c}/postimpute/
 
 # raw expression data (same as input to DataQC step)
@@ -41,18 +43,18 @@ genotype_pcs_path=${base_folder}/1_DataQC/out/${c}/outputfolder_gen/gen_PCs/Geno
 expression_pcs_path=${base_folder}/1_DataQC/out/${c}/outputfolder_exp/exp_PCs/exp_PCs.txt
 
 # output folder (needs to exist)
-output_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/run2/results/${c}_interactions/
+output_path=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/interactions/test2/
 
 
 # Path to the nextflow interaction analysis folder
-script_folder=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/ieQTL_nextflow_pipeline/
+script_folder=/groups/umcg-fg/tmp01/projects/eqtlgen-phase2/interactions/ieQTL_nextflow_pipeline/
 
 qtls_to_test=${script_folder}/data/sign_qtls_cistrans.txt.gz
-chunk_file=${script_folder}/data/ChunkingFile.GRCh38.110.txt
+chunk_file=${script_folder}/data/ChunkingFile.GRCh38.110_head.txt
 exp_platform=RNAseq
 
 # Command:
-NXF_VER=21.10.6 nextflow run /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/output/2023-03-16-sex-specific-analyses/test_nextflow/ieQTL_nextflow_pipeline/InteractionAnalysis.nf \
+NXF_VER=21.10.6 nextflow run /groups/umcg-fg/tmp01/projects/eqtlgen-phase2/interactions/ieQTL_nextflow_pipeline/InteractionAnalysis.nf \
 --vcf_dir $vcf_dir_path \
 --raw_expfile ${raw_exp_path} \
 --norm_expfile ${norm_exp_path} \

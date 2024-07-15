@@ -8,7 +8,7 @@ nextflow.enable.dsl = 2
 process IeQTLmapping {
     tag "Chunk: $chunk"
 
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true, failOnError: true
+    //publishDir "${params.outdir}", mode: 'copy', overwrite: true, failOnError: true
 
 
     input:
@@ -69,7 +69,7 @@ process IeQTLmapping {
 process IeQTLmapping_InteractionCovariates {
     tag "Chunk: $chunk"
 
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true, failOnError: true
+    //publishDir "${params.outdir}", mode: 'copy', overwrite: true, failOnError: true
 
     input:
         tuple path(preadjusted_expression), path(bed), path(bim), path(fam), path(interaction_covariates), path(limix_annotation), val(covariate_to_test), val(chunk), path(qtl_ch)
@@ -229,24 +229,29 @@ process PlotSTX3NOD2 {
 process ConvertIeQTLsToText {
     echo true
 
-     publishDir "${params.outdir}", mode: 'copy', overwrite: true, failOnError: true
+     publishDir params.outdir, mode: 'copy', overwrite: true, failOnError: true
 
     input:
     path limix_out_files
     
-    output: path "limix_out_text/*txt ", optional: true
+    output:
+        path "${params.covariate_to_test}.iqts.txt.gz*"
+        //path "limix_out_text/*txt.gz"
+        //path "limix_out_text/limix_out_text.md5"
+
 
     script:
     """
-    mkdir limix_out_text/
-    cp $limix_out_files limix_out_text/
+
     python /limix_qtl/Limix_QTL/post_processing/minimal_interaction_postprocess.py \
-      -id limix_out_text/ \
-      -od  limix_out_text/ \
-      -sfo
-    
-    gzip limix_out_text/*txt
-    md5sum -c limix_out_text/*txt > limix_out_text/*txt.md5sum
+      -id ./ \
+      -od  ./ \
+      -sfo \
+      --write_compressed
+
+    mv iqtl_results_all.txt.gz ${params.covariate_to_test}.iqts.txt.gz
+    md5sum  ${params.covariate_to_test}.iqts.txt.gz > ${params.covariate_to_test}.iqts.txt.gz.md5
+
 
     """
 }
