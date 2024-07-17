@@ -44,8 +44,8 @@ process Deconvolution {
       val exptype
 
     output:
-      path "cell_counts.txt"
-      //path "cell_counts.txt.md5"
+      path "cell_counts.txt", emit: cellCounts
+      path "cell_counts.txt.md5"
 
     script:
     """
@@ -57,6 +57,7 @@ process Deconvolution {
         ${exptype}
 
     md5sum cell_counts.txt > cell_counts.txt.md5
+
 
     """
 }
@@ -330,12 +331,14 @@ workflow PREPARE_COVARIATES {
     // the most common case: run deconvolution on TPM-normalized expression, estimate RNA quality in case of RNA-seq data and combine all covariates
     } else {
         if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") {
-            cell_counts_ch = Deconvolution(TPM(raw_expression_data, gene_lengths), signature_matrix, deconvolution_method, exp_type)
+            Deconvolution(TPM(raw_expression_data, gene_lengths), signature_matrix, deconvolution_method, exp_type)
+            cell_counts_ch = Deconvolution.out.cellCounts
             rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
             CombineCovariatesRNAqual(covariates,cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
             covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
         } else {
-            cell_counts_ch = Deconvolution(normalized_expression_data, signature_matrix, deconvolution_method, exp_type)
+            Deconvolution(normalized_expression_data, signature_matrix, deconvolution_method, exp_type)
+            cell_counts_ch = Deconvolution.out.cell_counts
             CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
             covariates_ch = CombineCovariates.out.covariates_ch
         }
