@@ -107,6 +107,9 @@ illumina_array_preprocess <- function(exp, gte, normalize = TRUE){
     if(!all(colnames(exp) == gte$V2)){stop("Something went wrong in matching genotype and expression IDs. Please debug!")}
     colnames(exp) <- gte$V1
 
+    gene_variance <- data.frame(gene = rownames(exp), gene_variance = apply(exp, 1, var))
+    exp <- exp[!rownames(exp) %in% gene_variance[gene_variance$gene_variance == 0, ]$gene, ]
+
     if (normalize == TRUE){
         # quantile normalization
         exp_n <- normalize.quantiles(exp, copy = FALSE)

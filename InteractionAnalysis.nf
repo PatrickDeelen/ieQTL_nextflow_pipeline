@@ -121,7 +121,7 @@ workflow {
     RUN_INTERACTION_QTL_MAPPING(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, Channel.of(params.covariate_to_test), chunk_ch.map { it[1] }, features_to_test_ch)
           
     /*
-     * Stratified analysis  if required 
+     * Stratified analysis if required
      */
     if (params.run_stratified){
       RUN_STRATIFIED_ANALYSIS(norm_exp_ch, bfile_ch, covariates_ch, annotation_ch, gte_ch, chunk_ch)

@@ -39,6 +39,9 @@ process IeQTLmapping {
         arg_line="-ff !{qtl_ch} -w 1000000 "
     fi
 
+    # --interaction_term is a colum from -cf
+    # all variables from -cf are used in model without interaction
+    # -gm gaussnorm does an inverse normal transformation of the expression data
     
     python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
      --plink ${plink_base} \
@@ -51,10 +54,12 @@ process IeQTLmapping {
       --interaction_term !{covariate_to_test} \
       -gr !{chunk} \
       -np !{params.num_perm} \
-      -maf 0.05 \
-      -c -gm gaussnorm \
+      -maf 0.01 \
+      -c \
+      -gm gaussnorm \
       -hwe 0.0001 \
-      --write_permutations --write_zscore
+      --write_permutations \
+      --write_zscore
 
 
       
@@ -97,6 +102,10 @@ process IeQTLmapping_InteractionCovariates {
         arg_line="-ff !{qtl_ch} -w 1000000 "
     fi
 
+    # --interaction_term is a colum from -cf
+    # all variables from -cf are used in model without interaction
+    # -gm gaussnorm does an inverse normal transformation of the expression data
+
     python /limix_qtl/Limix_QTL/run_interaction_QTL_analysis.py \
      --plink ${plink_base} \
       -af !{limix_annotation} \
@@ -108,11 +117,13 @@ process IeQTLmapping_InteractionCovariates {
       --interaction_term !{covariate_to_test} \
       -gr !{chunk} \
       -np !{params.num_perm} \
-      -maf 0.05 \
-      -c -gm gaussnorm \
+      -maf 0.01 \
+      -c \
+      -gm gaussnorm \
       -hwe 0.0001 \
       --interaction_covariates \
-      --write_permutations --write_zscore
+      --write_permutations \
+      --write_zscore
       
 
     '''

@@ -255,16 +255,35 @@ process ConvertVcfToPlink {
         tuple path("chr*bed"), path("chr*bim"), path("chr*fam"), emit: bfile_per_chr_ch
     
     script:
-    """    
-        ${projectDir}/tools/plink2  \
-            --vcf $vcf_file \
-            --make-bed --out chr${chr} \
-            --chr $chr  \
-            --const-fid \
-            --maf 0.05 --hwe 1e-06 --geno 0.05 --mac 10 \
-            --extract-if-info "R2 > 0.4"
+        if (params.qtls_to_test == ''){
+           """
+               ${projectDir}/tools/plink2  \
+                   --vcf $vcf_file \
+                   --make-bed --out chr${chr} \
+                   --chr $chr  \
+                   --const-fid \
+                   --maf 0.01 --hwe 1e-06 --geno 0.05 --mac 10 \
+                   --extract-if-info "R2 > 0.4"
 
-    """
+           """
+
+        }
+        else {
+         """
+            zcat  ${params.qtls_to_test} | cut -f 2 | gzip > snpsToTest.txt.gz
+
+            ${projectDir}/tools/plink2  \
+                --vcf $vcf_file \
+                --make-bed --out chr${chr} \
+                --chr $chr  \
+                --const-fid \
+                --extract snpsToTest.txt.gz \
+                --maf 0.01 --hwe 1e-06 --geno 0.05 --mac 10 \
+                --extract-if-info "R2 > 0.4"
+
+            """
+        }
+
 }
 
 /*
@@ -293,7 +312,7 @@ process MergePlinkPerChr {
 /*
  * Prepare covariate table: run deconvolution, estimate RNA quality, combine all covariates together
  */
-workflow PREPARE_COVARIATES {
+    workflow PREPARE_COVARIATES {
     take:
         exp_type
 	    raw_expression_data
@@ -318,30 +337,24 @@ workflow PREPARE_COVARIATES {
     
     // if lab-based cell proportions are provided: don't run deconvolution
     } else if (deconvolution_method == "lab"){
-        if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") { // if RNA-seq data
-            cell_counts_ch = Channel.fromPath(params.lab_cell_perc)
-            rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
-            CombineCovariatesRNAqual(covariates, cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
-            covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
-        } else {
-            cell_counts_ch = Channel.fromPath(params.lab_cell_perc)
-            CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
-            covariates_ch = CombineCovariates.out.covariates_ch
-        }
-    // the most common case: run deconvolution on TPM-normalized expression, estimate RNA quality in case of RNA-seq data and combine all covariates
+
+        cell_counts_ch = Channel.fromPath(params.lab_cell_perc)
+        rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
+        CombineCovariatesRNAqual(covariates, cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
+        covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
+
+    // the most common case: run deconvolution on TPM-normalized expression, estimate RNA quality and combine all covariates
     } else {
         if (exp_type == "RNAseq" || exp_type == "RNAseq_HGNC") {
             Deconvolution(TPM(raw_expression_data, gene_lengths), signature_matrix, deconvolution_method, exp_type)
-            cell_counts_ch = Deconvolution.out.cellCounts
-            rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
-            CombineCovariatesRNAqual(covariates,cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
-            covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
+
         } else {
             Deconvolution(normalized_expression_data, signature_matrix, deconvolution_method, exp_type)
-            cell_counts_ch = Deconvolution.out.cell_counts
-            CombineCovariates(covariates,cell_counts_ch, genotype_pcs, gte)
-            covariates_ch = CombineCovariates.out.covariates_ch
-        }
+         }
+        cell_counts_ch = Deconvolution.out.cellCounts
+        rnaquality_ch = CalculateRNAQualityScore(normalized_expression_data)
+        CombineCovariatesRNAqual(covariates,cell_counts_ch, genotype_pcs, gte, rnaquality_ch)
+        covariates_ch = CombineCovariatesRNAqual.out.covariates_ch
     }   
     
     emit:
